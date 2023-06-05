@@ -113,7 +113,7 @@ public class DBApp {
 			String clusteringCol = tupleInfo[1];
 			String clusteringType = tupleInfo[2];
 			String clusteringVal = tupleInfo[3];
-			Class colClass = Class.forName(clusteringCol);
+			Class colClass = Class.forName(clusteringType);
 			Constructor constructor = colClass.getConstructor(String.class);
 			Object clusterVal = constructor.newInstance(clusteringVal);
 			if (curTable.hasIndex()) {
@@ -132,12 +132,11 @@ public class DBApp {
 					// iterate over existing pages/tuples to find location of current tuple
 					// shift any other tuples that are below the current tuple
 					int rowReq = -1;
-					File pageReq = null;
+					int pageReq = -1;
 					int row = 1;
 					File firstPage = curTable.getPages().get(0);
 					String filePath = firstPage.getPath();
-					String[][] pageData = reader.readCSV(filePath);
-					//index at which the tuple should be inserted
+					String[][] pageData = reader.readNSizeTable(filePath);
 					int clusterColIndex = 0;
 					String[] header = pageData[0];
 					for (int j = 0; j < header.length; j++) {
@@ -148,31 +147,81 @@ public class DBApp {
 					}
 					for (int i = 0; i < curTable.getPages().size(); i++) {
 						File curPage = curTable.getPages().get(i);
-						for (row = 1; row < pageData.length; row++) {
+						pageData = reader.readNSizeTable(curPage.getPath());
+						//printGrid(pageData);
+						for (row = 1; (row < pageData.length) && pageData[row][clusterColIndex] == null; row++) {
 							// prepare the values to be compared
 							// compare the values to find index of insertion
 							Object curVal = constructor.newInstance(pageData[row][clusterColIndex]);
 							if (((Comparable) clusterVal).compareTo(curVal) < 0) {
 								rowReq = row;
-								pageReq = curPage;
+								pageReq = i;
 								break;
 							}
 						}
 					}
 					if (rowReq == -1) {
 						rowReq = row;
-						pageReq = curTable.getPages().get(curTable.getPages().size() - 1);
+						pageReq = curTable.getPages().size() - 1;
 					}
-					//shift tuples if required
-					
+					// shift tuples if required
+					shiftTuples(curTable, pageReq, rowReq);
+					filePath = curTable.getPages().get(pageReq).getPath();
+					String[][] page = reader.readNSizeTable(curTable.getPages().get(pageReq).getPath());
+					writer.writePage(filePath, page);
 				}
 			}
-		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-				| InvocationTargetException | ClassNotFoundException | NoSuchMethodException | SecurityException e) {
+		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
+				| ClassNotFoundException | NoSuchMethodException | SecurityException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} 
+		}
 
+	}
+
+	// shift tuples in the table
+	public static void shiftTuples(Table table, int page, int row) {
+		int i = table.getPages().size() - 1;
+		int j = -1;
+		for (; i >= page; i--) {
+			String[][] pageContent = reader.readNSizeTable(table.getPages().get(i).getPath());
+			for (j = pageContent.length - 1; j >= 1 && j != row; j--) {
+				while (pageContent[j] == null) {
+					j--;
+				}
+				if (j == 1) {
+					// if at the beginning of a file and need to read from previous file
+					String[][] prevPage = reader.readNSizeTable(table.getPages().get(i - 1).getPath());
+					String filePath = table.getPath() + "Page" + (table.getPages().size() + 1) + ".csv";
+					
+					// get 201 from metadata
+
+					pageContent[1] = prevPage[200];
+					writer.writePage(filePath, pageContent);
+				} else if (j == 200 && i == table.getPages().size() - 1) {
+					// if at the last tuple of the last page
+					// need to create a new page and shift into it
+					String filePath = table.getPath() + "Page" + (table.getPages().size() + 1) + ".csv";
+					createPage(table, filePath);
+					writer.appendToFile(filePath, convertToString(pageContent[j]));
+				} else if (j < 200) {
+					// regular case
+					// normal shifting
+					pageContent[j + 1] = pageContent[j];
+				}
+			}
+		}
+	}
+
+	// converts an array to a String in csv format
+	public static String convertToString(String[] arr) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < arr.length; i++) {
+			sb.append(arr[i]);
+			if (i != arr.length - 1)
+				sb.append(",");
+		}
+		return sb.toString();
 	}
 
 	// create a new page for the table
@@ -292,6 +341,15 @@ public class DBApp {
 
 	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
 		return null;
+	}
+
+	public static void printGrid(String[][] grid) {
+		for (String[] row : grid) {
+			for (String element : row) {
+				System.out.print(element + " ");
+			}
+			System.out.println();
+		}
 	}
 
 }

@@ -1,4 +1,4 @@
 TableName,ColumnName,ColumnType,ClusteringKey,IndexName,IndexType,min,max,ForeignKey,ForeignTableName,ForeignColumnName,Computed
-Product,ProductID,java.lang.Integer,true,null,null,0,1000,false,null,null,false
-Product,ProductPrice,java.lang.Double,false,null,null,0,100000,false,null,null,false
-Product,ProductName,java.lang.String,false,null,null,A,ZZZZZZZZ,false,null,null,false
+Product,ProductID,java.lang.Integer,True,null,null,0,1000,False,null,null,False
+Product,ProductPrice,java.lang.Double,False,null,null,0,100000,False,null,null,False
+Product,ProductName,java.lang.String,False,null,null,A,ZZZZZZZZ,False,null,null,False

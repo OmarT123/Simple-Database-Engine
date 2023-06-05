@@ -39,6 +39,13 @@ public class Tester {
 			htblColNameVal.put("ProductName", new String("Power Bank"));
 			htblColNameVal.put("ProductPrice", new Double(15.5));
 			db.insertIntoTable("Product", htblColNameVal);
+			for (int i = 4; i < 9; i++) {
+				htblColNameVal = new Hashtable<>();
+				htblColNameVal.put("ProductID", new Integer(i));
+				htblColNameVal.put("ProductName", new String("Power Bank"));
+				htblColNameVal.put("ProductPrice", new Double(15.5));
+				db.insertIntoTable("Product", htblColNameVal);
+			}
 			//GridIndex index = new GridIndex("Index", "Table", "Employee", "0", "1000", "Worker", "0", "1000");
 			//index.printIndex();
 		} catch (DBAppException e) {

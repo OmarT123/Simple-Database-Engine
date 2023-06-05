@@ -9,7 +9,7 @@ public class Writer {
 			// Writing content to the file
 			writer.write(content);
 			writer.newLine();
-			System.out.println("Data apppended to CSV file successfully.");
+			//System.out.println("Data apppended to CSV file successfully.");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -22,6 +22,30 @@ public class Writer {
 			writer.write(content);
 			writer.newLine();
 			System.out.println("Data written to CSV file successfully.");
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	//Writes an entire Page
+	public static void writePage(String fileName, String[][] page) {
+		StringBuilder content = new StringBuilder();
+		for (int i = 0; i < page.length; i++) {
+			if (page[i][0] == null)
+				break;
+			for (int j = 0; j < page[i].length; j++) {
+				content.append(page[i][j]);
+				if (j == page[i].length - 1)
+					content.append("\n");
+				else
+					content.append(",");
+			}
+		}
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
+			// Writing data to the CSV file
+			writer.write(content.toString());
+			writer.newLine();
+			System.out.println("Page written to CSV file successfully.");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
