@@ -28,7 +28,6 @@ public class Table extends Iterator {
 			System.out.println("Folder already exists.");
 		}
 		this.path += "\\" + name + "\\";
-		System.out.println(this.path);
 		this.hasIndex = false;
  	}
 	

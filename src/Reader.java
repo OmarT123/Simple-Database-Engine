@@ -5,20 +5,27 @@ public class Reader {
 	
 
 	// reads a CSV file and returns as a 2d array
-	public static String[][] readCSV(String filePath) throws IOException {
+	public static String[][] readCSV(String filePath) {
 		List<String[]> res = new ArrayList<>();
+		String[][] data = null;
 		try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
 			String tuple;
 			while ((tuple = reader.readLine()) != null) {
 				String[] temp = tuple.split(",");
 				res.add(temp);
 			}
-		}
-		int numRows = res.size();
-		int numCols = res.get(0).length;
-		String[][] data = new String[numRows][numCols];
-		for (int i = 0; i < numRows; i++) {
-			data[i] = res.get(i);
+			int numRows = res.size();
+			int numCols = res.get(0).length;
+			data = new String[numRows][numCols];
+			for (int i = 0; i < numRows; i++) {
+				data[i] = res.get(i);
+			}
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		return data;
 	}

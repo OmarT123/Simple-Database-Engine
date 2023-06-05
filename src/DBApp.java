@@ -49,7 +49,7 @@ public class DBApp {
 			String colType = entry.getValue();
 			row.append(colType);
 			row.append(",");
-			row.append(strClusteringKeyColumn.equals(colName) ? "true" : "false");
+			row.append(strClusteringKeyColumn.equals(colName) ? "True" : "False");
 			row.append(",");
 			row.append("null");
 			row.append(",");
@@ -71,14 +71,14 @@ public class DBApp {
 				tableName = foreignTableCol[0];
 				tableCol = foreignTableCol[1];
 			}
-			row.append(tableName == null ? "false" : "true");
+			row.append(tableName == null ? "False" : "True");
 			row.append(",");
 			row.append(tableName);
 			row.append(",");
 			row.append(tableCol);
 			row.append(",");
 			boolean computed = listContains(colName, computedCols);
-			row.append(computed ? "true" : "false");
+			row.append(computed ? "True" : "False");
 			arrayList.add(row.toString());
 		}
 		for (int i = 0; i < arrayList.size(); i++) {
@@ -104,79 +104,143 @@ public class DBApp {
 	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException {
 		if (!tables.containsKey(strTableName))
 			throw new DBAppException(strTableName + " Table does not exist");
-		Table curTable = tables.get(strTableName);
+		try {
+			Table curTable = tables.get(strTableName);
 
-		// Get tuple to be inserted in Table
-		String tuple = getTuple(strTableName, htblColNameValue);
-
-		if (curTable.hasIndex()) {
-			// if an index is created on the table
-		} else {
-			// No index is created on the table
-			// so insert according to clustering key
-			if (curTable.getPages().isEmpty()) {
-				// Table is currently empty
-				// create a new page and store the first tuple in it
-				String filePath = curTable.getPath() + "Page" + (curTable.getPages().size() + 1) + ".csv";
-				System.out.println(filePath);
-				File file = new File(filePath);
-				try {
-					if (file.createNewFile()) {
-						System.out.println("File created successfully.");
-					} else {
-						System.out.println("File already exists.");
-					}
-				} catch (IOException e) {
-					System.out.println("An error occurred while creating the file: " + e.getMessage());
-				}
-				curTable.getPages().add(file);
-				
-				//store names of cols
-				
-				writer.appendToFile(filePath, tuple);
+			// Get tuple to be inserted in Table and verify it with meta data
+			String[] tupleInfo = getTuple(strTableName, htblColNameValue);
+			String tuple = tupleInfo[0];
+			String clusteringCol = tupleInfo[1];
+			String clusteringType = tupleInfo[2];
+			String clusteringVal = tupleInfo[3];
+			Class colClass = Class.forName(clusteringCol);
+			Constructor constructor = colClass.getConstructor(String.class);
+			Object clusterVal = constructor.newInstance(clusteringVal);
+			if (curTable.hasIndex()) {
+				// if an index is created on the table
 			} else {
-				// Table already has Pages
+				// No index is created on the table
+				// so insert according to clustering key
+				if (curTable.getPages().isEmpty()) {
+					// Table is currently empty
+					// create a new page and store the first tuple in it
+					String filePath = curTable.getPath() + "Page" + (curTable.getPages().size() + 1) + ".csv";
+					createPage(curTable, filePath);
+					writer.appendToFile(filePath, tuple);
+				} else {
+					// Table already has Pages
+					// iterate over existing pages/tuples to find location of current tuple
+					// shift any other tuples that are below the current tuple
+					int rowReq = -1;
+					File pageReq = null;
+					int row = 1;
+					File firstPage = curTable.getPages().get(0);
+					String filePath = firstPage.getPath();
+					String[][] pageData = reader.readCSV(filePath);
+					//index at which the tuple should be inserted
+					int clusterColIndex = 0;
+					String[] header = pageData[0];
+					for (int j = 0; j < header.length; j++) {
+						if (header[j].equals(clusteringCol)) {
+							clusterColIndex = j;
+							break;
+						}
+					}
+					for (int i = 0; i < curTable.getPages().size(); i++) {
+						File curPage = curTable.getPages().get(i);
+						for (row = 1; row < pageData.length; row++) {
+							// prepare the values to be compared
+							// compare the values to find index of insertion
+							Object curVal = constructor.newInstance(pageData[row][clusterColIndex]);
+							if (((Comparable) clusterVal).compareTo(curVal) < 0) {
+								rowReq = row;
+								pageReq = curPage;
+								break;
+							}
+						}
+					}
+					if (rowReq == -1) {
+						rowReq = row;
+						pageReq = curTable.getPages().get(curTable.getPages().size() - 1);
+					}
+					//shift tuples if required
+					
+				}
 			}
+		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+				| InvocationTargetException | ClassNotFoundException | NoSuchMethodException | SecurityException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+
+	}
+
+	// create a new page for the table
+	public static void createPage(Table table, String filePath) {
+		File file = new File(filePath);
+		try {
+			if (file.createNewFile()) {
+				System.out.println("File created successfully.");
+			} else {
+				System.out.println("File already exists.");
+			}
+		} catch (IOException e) {
+			System.out.println("An error occurred while creating the file: " + e.getMessage());
 		}
+		table.getPages().add(file);
+		StringBuilder colHeaders = new StringBuilder();
+		String[][] metaData = reader.readCSV("metadata.csv");
+		String[][] tableMeta = reader.readTableMeta(metaData, table.getName());
+		for (int i = 0; i < tableMeta.length; i++) {
+			colHeaders.append(tableMeta[i][1]);
+			if (tableMeta.length - 1 != i)
+				colHeaders.append(",");
+		}
+		writer.overwriteFile(filePath, colHeaders.toString());
+
 	}
 
 	// verify input data with metadata file
 	// check min, max, foreign key, computed (if computed value is inserted throw an
 	// error)
 	// create tuple to be inserted
-	public static String getTuple(String strTableName, Hashtable<String, Object> htblColNameValue)
+	public static String[] getTuple(String strTableName, Hashtable<String, Object> htblColNameValue)
 			throws DBAppException {
 		if (!tables.containsKey(strTableName))
 			throw new DBAppException(strTableName + " Table does not exist");
-//		for (Map.Entry<String, Object> entry : htblColNameValue.entrySet()) {
-//            System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue().toString());
-//        }
+		String[] res = new String[4];
 		StringBuilder sb = new StringBuilder();
 		String[][] metaData;
 		try {
 			metaData = reader.readCSV("metadata.csv");
 			String[][] tableMeta = reader.readTableMeta(metaData, strTableName);
 			for (int i = 0; i < tableMeta.length; i++) {
+				if (tableMeta[i][3].equals("True")) {
+					res[1] = tableMeta[i][1];
+					res[2] = tableMeta[i][2];
+				}
+			}
+			for (int i = 0; i < tableMeta.length; i++) {
 				// getting column name and its value
 				String colName = tableMeta[i][1];
-				boolean computed = tableMeta[i][11].equals("true")? true : false;
-				if (!htblColNameValue.containsKey(colName) && computed)
-				{
-					//compute value
-					
+				boolean computed = tableMeta[i][11].equals("true") ? true : false;
+				if (!htblColNameValue.containsKey(colName) && computed) {
+					// compute value
+
 					continue;
 				}
 				if (htblColNameValue.containsKey(colName) && computed)
 					throw new DBAppException(colName + " is a computed col and should not be inserted");
 				Object value = htblColNameValue.get(colName);
-				System.out.println(value.toString());
+				if (colName.equals(res[1]))
+					res[3] = value.toString();
 				// getting control data from csv file to verify the input tuple
 				String colType = tableMeta[i][2];
 				String min = tableMeta[i][6];
 				String max = tableMeta[i][7];
-				
-				//check for foreign key
-				
+
+				// check for foreign key
+
 				Class colClass = Class.forName(colType);
 				Constructor constructor = colClass.getConstructor(String.class);
 				Object minObj = constructor.newInstance(min);
@@ -190,11 +254,8 @@ public class DBApp {
 				sb.append(value.toString());
 				if (i != tableMeta.length - 1)
 					sb.append(",");
-				System.out.println("here");
 			}
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			res[0] = sb.toString();
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -217,7 +278,7 @@ public class DBApp {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		return sb.toString();
+		return res;
 	}
 
 	public void updateTable(String strTableName, String strClusteringKeyValue,

@@ -39,25 +39,15 @@ public class Tester {
 			htblColNameVal.put("ProductName", new String("Power Bank"));
 			htblColNameVal.put("ProductPrice", new Double(15.5));
 			db.insertIntoTable("Product", htblColNameVal);
-			GridIndex index = new GridIndex("Index", "Table", "Employee", "0", "1000", "Worker", "0", "1000");
-			index.printIndex();
+			//GridIndex index = new GridIndex("Index", "Table", "Employee", "0", "1000", "Worker", "0", "1000");
+			//index.printIndex();
 		} catch (DBAppException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
 		
-//		Reader reader = new Reader();
-//		try {
-//			String[][] meta = reader.readCSV("metadata.csv");
-//			printGrid(meta);
-//			System.out.println("-----");
-//			String[][] product = reader.readTableMeta(meta, "Product");
-//			printGrid(product);
-//		} catch (IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
+
 		
 	}
 }
