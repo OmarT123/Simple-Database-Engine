@@ -148,7 +148,7 @@ public class DBApp {
 					for (int i = 0; i < curTable.getPages().size(); i++) {
 						File curPage = curTable.getPages().get(i);
 						pageData = reader.readNSizeTable(curPage.getPath());
-						//printGrid(pageData);
+						// printGrid(pageData);
 						for (row = 1; (row < pageData.length) && pageData[row][clusterColIndex] == null; row++) {
 							// prepare the values to be compared
 							// compare the values to find index of insertion
@@ -161,13 +161,20 @@ public class DBApp {
 						}
 					}
 					if (rowReq == -1) {
-						rowReq = row;
+						rowReq = row + 1;
 						pageReq = curTable.getPages().size() - 1;
 					}
 					// shift tuples if required
-					shiftTuples(curTable, pageReq, rowReq);
-					filePath = curTable.getPages().get(pageReq).getPath();
 					String[][] page = reader.readNSizeTable(curTable.getPages().get(pageReq).getPath());
+					printGrid(page);
+					System.out.println("-----");
+					System.out.println(tuple);
+					if (page[rowReq][0] != null)
+						shiftTuples(curTable, pageReq, rowReq);
+					else
+						page[rowReq] = tuple.split(",");
+					//printGrid(page);
+					filePath = curTable.getPages().get(pageReq).getPath();
 					writer.writePage(filePath, page);
 				}
 			}
@@ -186,14 +193,14 @@ public class DBApp {
 		for (; i >= page; i--) {
 			String[][] pageContent = reader.readNSizeTable(table.getPages().get(i).getPath());
 			for (j = pageContent.length - 1; j >= 1 && j != row; j--) {
-				while (pageContent[j] == null) {
+				while (pageContent[j][0] == null) {
 					j--;
 				}
 				if (j == 1) {
 					// if at the beginning of a file and need to read from previous file
 					String[][] prevPage = reader.readNSizeTable(table.getPages().get(i - 1).getPath());
 					String filePath = table.getPath() + "Page" + (table.getPages().size() + 1) + ".csv";
-					
+
 					// get 201 from metadata
 
 					pageContent[1] = prevPage[200];
@@ -345,6 +352,8 @@ public class DBApp {
 
 	public static void printGrid(String[][] grid) {
 		for (String[] row : grid) {
+			if (row[0] == null)
+				break;
 			for (String element : row) {
 				System.out.print(element + " ");
 			}
