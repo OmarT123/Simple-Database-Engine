@@ -106,7 +106,6 @@ public class DBApp {
 			throw new DBAppException(strTableName + " Table does not exist");
 		try {
 			Table curTable = tables.get(strTableName);
-
 			// Get tuple to be inserted in Table and verify it with meta data
 			String[] tupleInfo = getTuple(strTableName, htblColNameValue);
 			String tuple = tupleInfo[0];
@@ -148,8 +147,7 @@ public class DBApp {
 					for (int i = 0; i < curTable.getPages().size(); i++) {
 						File curPage = curTable.getPages().get(i);
 						pageData = reader.readNSizeTable(curPage.getPath());
-						// printGrid(pageData);
-						for (row = 1; (row < pageData.length) && pageData[row][clusterColIndex] == null; row++) {
+						for (row = 1; (row < pageData.length) && pageData[row][clusterColIndex] != null; row++) {
 							// prepare the values to be compared
 							// compare the values to find index of insertion
 							Object curVal = constructor.newInstance(pageData[row][clusterColIndex]);
@@ -161,21 +159,24 @@ public class DBApp {
 						}
 					}
 					if (rowReq == -1) {
-						rowReq = row + 1;
+						rowReq = row;
 						pageReq = curTable.getPages().size() - 1;
 					}
 					// shift tuples if required
 					String[][] page = reader.readNSizeTable(curTable.getPages().get(pageReq).getPath());
-					printGrid(page);
-					System.out.println("-----");
-					System.out.println(tuple);
-					if (page[rowReq][0] != null)
+					if (rowReq >= 201) {
+						filePath = curTable.getPath() + "Page" + (curTable.getPages().size() + 1) + ".csv";
+						createPage(curTable, filePath);
+						writer.appendToFile(filePath, tuple);
+					} else if (page[rowReq][0] != null) {
 						shiftTuples(curTable, pageReq, rowReq);
-					else
+						filePath = curTable.getPages().get(pageReq).getPath();
+						writer.writePage(filePath, page);
+					} else {
 						page[rowReq] = tuple.split(",");
-					//printGrid(page);
-					filePath = curTable.getPages().get(pageReq).getPath();
-					writer.writePage(filePath, page);
+						filePath = curTable.getPages().get(pageReq).getPath();
+						writer.writePage(filePath, page);
+					}
 				}
 			}
 		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
@@ -236,9 +237,9 @@ public class DBApp {
 		File file = new File(filePath);
 		try {
 			if (file.createNewFile()) {
-				System.out.println("File created successfully.");
+				// System.out.println("File created successfully.");
 			} else {
-				System.out.println("File already exists.");
+				// System.out.println("File already exists.");
 			}
 		} catch (IOException e) {
 			System.out.println("An error occurred while creating the file: " + e.getMessage());
@@ -359,6 +360,13 @@ public class DBApp {
 			}
 			System.out.println();
 		}
+	}
+
+	public static void printArray(String[] arr) {
+		for (String s : arr) {
+			System.out.print(s + " ");
+		}
+		System.out.println();
 	}
 
 }

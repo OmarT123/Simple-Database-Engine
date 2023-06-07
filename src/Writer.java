@@ -21,7 +21,7 @@ public class Writer {
 			// Writing data to the CSV file
 			writer.write(content);
 			writer.newLine();
-			System.out.println("Data written to CSV file successfully.");
+			//System.out.println("Data written to CSV file successfully.");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -35,17 +35,16 @@ public class Writer {
 				break;
 			for (int j = 0; j < page[i].length; j++) {
 				content.append(page[i][j]);
-				if (j == page[i].length - 1)
-					content.append("\n");
-				else
-					content.append(",");
+				content.append(",");
 			}
+			content.append("\n");
 		}
+		content.deleteCharAt(content.length() - 1);
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
 			// Writing data to the CSV file
 			writer.write(content.toString());
 			writer.newLine();
-			System.out.println("Page written to CSV file successfully.");
+			//System.out.println("Page written to CSV file successfully.");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

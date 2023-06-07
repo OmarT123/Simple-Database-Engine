@@ -35,11 +35,7 @@ public class Tester {
 			db.createTable("Product", "ProductID", htblColNameType, htblColNameMin, htblColNameMax, htblForeignKeys,
 					computedCols);
 			Hashtable<String, Object> htblColNameVal = new Hashtable<>();
-			htblColNameVal.put("ProductID", new Integer(3));
-			htblColNameVal.put("ProductName", new String("Power Bank"));
-			htblColNameVal.put("ProductPrice", new Double(15.5));
-			db.insertIntoTable("Product", htblColNameVal);
-			for (int i = 4; i < 9; i++) {
+			for (int i = 10; i > 1; i--) {
 				htblColNameVal = new Hashtable<>();
 				htblColNameVal.put("ProductID", new Integer(i));
 				htblColNameVal.put("ProductName", new String("Power Bank"));
@@ -48,6 +44,7 @@ public class Tester {
 			}
 			//GridIndex index = new GridIndex("Index", "Table", "Employee", "0", "1000", "Worker", "0", "1000");
 			//index.printIndex();
+			System.out.println("Terminated");
 		} catch (DBAppException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
