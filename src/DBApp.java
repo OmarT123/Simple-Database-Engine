@@ -33,7 +33,7 @@ public class DBApp {
 			Hashtable<String, String> htblColNameType, Hashtable<String, String> htblColNameMin,
 			Hashtable<String, String> htblColNameMax, Hashtable<String, String> htblForeignKeys, String[] computedCols)
 			throws DBAppException {
-		Table t = new Table(strTableName);
+		Table t = new Table(strTableName, strClusteringKeyColumn);
 		String csvFilePath = "metadata.csv";
 		ArrayList<String> arrayList = new ArrayList<>();
 		Iterator<Map.Entry<String, String>> iterator = htblColNameType.entrySet().iterator();
@@ -155,7 +155,8 @@ public class DBApp {
 								rowReq = row;
 								pageReq = i;
 								break;
-							}
+							} else if (((Comparable) clusterVal).compareTo(curVal) == 0)
+								throw new DBAppException("Can not have duplicates of clustering key value");
 						}
 					}
 					if (rowReq == -1) {
@@ -169,7 +170,8 @@ public class DBApp {
 						createPage(curTable, filePath);
 						writer.appendToFile(filePath, tuple);
 					} else if (page[rowReq][0] != null) {
-						shiftTuples(curTable, pageReq, rowReq);
+						page = shiftTuples(curTable, pageReq, rowReq);
+						page[row] = tuple.split(",");
 						filePath = curTable.getPages().get(pageReq).getPath();
 						writer.writePage(filePath, page);
 					} else {
@@ -188,7 +190,7 @@ public class DBApp {
 	}
 
 	// shift tuples in the table
-	public static void shiftTuples(Table table, int page, int row) {
+	public static String[][] shiftTuples(Table table, int page, int row) {
 		int i = table.getPages().size() - 1;
 		int j = -1;
 		for (; i >= page; i--) {
@@ -197,7 +199,7 @@ public class DBApp {
 				while (pageContent[j][0] == null) {
 					j--;
 				}
-				if (j == 1) {
+				if (j == 1 && i != table.getPages().size() - 1) {
 					// if at the beginning of a file and need to read from previous file
 					String[][] prevPage = reader.readNSizeTable(table.getPages().get(i - 1).getPath());
 					String filePath = table.getPath() + "Page" + (table.getPages().size() + 1) + ".csv";
@@ -215,21 +217,15 @@ public class DBApp {
 				} else if (j < 200) {
 					// regular case
 					// normal shifting
-					pageContent[j + 1] = pageContent[j];
+					while (j >= row) {
+						pageContent[j + 1] = pageContent[j];
+						j--;
+					}
+					return pageContent;
 				}
 			}
 		}
-	}
-
-	// converts an array to a String in csv format
-	public static String convertToString(String[] arr) {
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < arr.length; i++) {
-			sb.append(arr[i]);
-			if (i != arr.length - 1)
-				sb.append(",");
-		}
-		return sb.toString();
+		return null;
 	}
 
 	// create a new page for the table
@@ -340,7 +336,76 @@ public class DBApp {
 
 	public void updateTable(String strTableName, String strClusteringKeyValue,
 			Hashtable<String, Object> htblColNameValue) throws DBAppException {
+		// search for the tuple using its clustering value
+		// update the values, then write the tuple back in the table
+		if (!tables.containsKey(strTableName))
+			throw new DBAppException(strTableName + " Table does not exist");
+		try {
+			Table curTable = tables.get(strTableName);
+			if (curTable.hasIndex()) {
+				// if there is an index created on the table required
+			} else {
+				// if no index is created on the table
+				// search linearly through the entire table to find the required tuple
+				String[][] headerAndTuple = findTuple(curTable, strClusteringKeyValue);
+				String[] header = headerAndTuple[0];
+				String[] tuple = headerAndTuple[1];
 
+				// find changed values and change them in the tuple
+				for (int i = 0; i < header.length; i++) {
+					if (htblColNameValue.containsKey(header[i])) {
+						// change its value in the tuple
+						tuple[i] = htblColNameValue.get(header[i]).toString();
+					}
+				}
+				// write the updated tuple back to the table
+				writeUpdatedTuple(curTable, tuple);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	// searches for the location of the old tuple
+	// and replaces it with the new one
+	public static void writeUpdatedTuple(Table table, String[] tuple) {
+		for (int i = 0; i < table.getPages().size(); i++) {
+			String[][] page = reader.readCSV(table.getPages().get(i).getPath());
+			int clusterColIndex = 0;
+			for (int h = 0; h < page[0].length; h++) {
+				if (table.getClusterCol().equals(page[0][h])) {
+					clusterColIndex = h;
+				}
+			}
+			for (int j = 1; j < page.length; j++) {
+				if (page[j][clusterColIndex].equals(tuple[clusterColIndex])) {
+					page[j] = tuple;
+					writer.writePage(table.getPages().get(i).getPath(), page);
+				}
+			}
+		}
+	}
+
+	// searches linearly through all pages of the table to find the requested tuple
+	public static String[][] findTuple(Table table, String strClusteringKeyValue) throws DBAppException {
+		String[][] res;
+		for (int i = 0; i < table.getPages().size(); i++) {
+			String[][] page = reader.readCSV(table.getPages().get(i).getPath());
+			res = new String[page.length][2];
+			int clusterColIndex = 0;
+			for (int h = 0; h < page[0].length; h++) {
+				if (table.getClusterCol().equals(page[0][h]))
+					clusterColIndex = h;
+			}
+			for (int j = 1; j < page.length; j++) {
+				if (strClusteringKeyValue.equals(page[j][clusterColIndex])) {
+					res[0] = page[0];
+					res[1] = page[j];
+					return res;
+				}
+			}
+		}
+		throw new DBAppException("Tuple not found in Table");
 	}
 
 	public void deleteFromTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException {
@@ -369,4 +434,14 @@ public class DBApp {
 		System.out.println();
 	}
 
+	// converts an array to a String in csv format
+	public static String convertToString(String[] arr) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < arr.length; i++) {
+			sb.append(arr[i]);
+			if (i != arr.length - 1)
+				sb.append(",");
+		}
+		return sb.toString();
+	}
 }

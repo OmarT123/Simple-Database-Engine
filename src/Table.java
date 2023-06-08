@@ -5,14 +5,16 @@ import javax.swing.text.AttributeSet;
 import javax.swing.text.html.HTML.Tag;
 import javax.swing.text.html.HTMLDocument.Iterator;
 
-public class Table extends Iterator {
+public class Table{
 	private String name;
 	private ArrayList<File> pages;
 	private String path;
 	private boolean hasIndex;
+	private String clusterCol;
 	
-	public Table(String name) {
+	public Table(String name, String clusterCol) {
 		this.name = name;
+		this.clusterCol = clusterCol;
 		this.pages = new ArrayList<>();
 		String folderName = name;
 		this.path = System.getProperty("user.dir");
@@ -31,6 +33,14 @@ public class Table extends Iterator {
 		this.hasIndex = false;
  	}
 	
+	public String getClusterCol() {
+		return clusterCol;
+	}
+
+	public void setClusterCol(String clusterCol) {
+		this.clusterCol = clusterCol;
+	}
+
 	public String getPath()
 	{	
 		return path;
@@ -63,40 +73,4 @@ public class Table extends Iterator {
 	public void setPath(String path) {
 		this.path = path;
 	}
-
-	public AttributeSet getAttributes() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public int getStartOffset() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	@Override
-	public int getEndOffset() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	@Override
-	public void next() {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public boolean isValid() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public Tag getTag() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
 }
