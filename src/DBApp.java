@@ -2,6 +2,9 @@ import java.io.IOException;
 import java.lang.constant.Constable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Map;
@@ -189,7 +192,7 @@ public class DBApp {
 
 	}
 
-	// shift tuples in the table
+	// shift tuples in the table for insertion method
 	public static String[][] shiftTuples(Table table, int page, int row) {
 		int i = table.getPages().size() - 1;
 		int j = -1;
@@ -409,8 +412,83 @@ public class DBApp {
 	}
 
 	public void deleteFromTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException {
+		if (!tables.containsKey(strTableName))
+			throw new DBAppException(strTableName + " Table does not exist");
+		try {
+			Table curTable = tables.get(strTableName);
+			if (curTable.hasIndex()) {
+				// if there is an index created on the table required
+			} else {
+				// if no index is created on the table
+				// search linearly through the entire table to find the required tuple/tuples
+				String[][] res;
+				String[][] res1;
+				int k = 0;
+				int index = 0;
+				for (int i = 0; i < curTable.getPages().size(); i++) {
+					String[][] page = reader.readCSV(curTable.getPages().get(i).getPath());
+					res = new String[page.length][2];
+					int clusterColIndex = 0;
+					System.out.println("he");
+					for (int h = 0; h < page[0].length; h++) {
+						if (curTable.getClusterCol().equals(page[0][h]))
+							clusterColIndex = h;
+					}
+					for (int j = 1; j < page.length; j++) {// loop till i know which one is in the deletion list get the
+															// index from it
+						if (htblColNameValue.containsValue(j)) {
+							index = j;
+
+						}
+					}
+
+				}
+				shiftupTuples(curTable, index);
+
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 
 	}
+
+	// shift tuples in the table for deletion method
+	public static String[][] shiftupTuples(Table table, int index) {//<------------------doesnt make the last attribute empty
+		int page_num = index / 200;// to get the page of the deleted info
+		int Req_row = index + 1;
+		if (page_num > 0) {
+			Req_row = (index + 1) - ((200 * (page_num - 1)) - 1);// to get the row of the info will be deleted
+		}
+		String[][] page = reader.readCSV(table.getPages().get(page_num).getPath());
+		if (page.length > 2) {// first reserved for the labels and the second for the first and only attribute
+								// which will be deleted
+			for (int i = 1; i < page.length; i++) {
+				if (i == Req_row) {
+					for (int j = Req_row; j < page.length - 1; j++) {// shift from the required row till the end
+						System.out.println(Arrays.toString(page[j]) + "" + "before");
+						page[j] = page[j + 1];
+						System.out.println(Arrays.toString(page[j]) + "" + "after");
+					}
+					break;
+				}
+			}
+			String filePath = table.getPages().get(page_num).getPath();
+			writer.writePage(filePath, page);
+
+		}
+		else {
+			try {
+				Path path = Paths.get(table.getPages().get(page_num).getPath());
+				Files.delete(path);
+				System.out.println(path);
+				System.out.println("File deleted successfully.");
+			} catch (IOException e) {
+				System.out.println("An error occurred while deleting the file: " + e.getMessage());
+			}
+		}
+
+		return null;
+	}// <--------------------------------------------------------------------------------------------------------------------------------------------------------->
 
 	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
 		return null;

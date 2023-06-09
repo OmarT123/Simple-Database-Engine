@@ -35,7 +35,7 @@ public class Tester {
 			db.createTable("Product", "ProductID", htblColNameType, htblColNameMin, htblColNameMax, htblForeignKeys,
 					computedCols);
 			Hashtable<String, Object> htblColNameVal = new Hashtable<>();
-			for (int i = 201; i >= 1; i--) {
+			for (int i = 0; i <= 200; i++) {
 				htblColNameVal = new Hashtable<>();
 				htblColNameVal.put("ProductID", new Integer(i));
 				htblColNameVal.put("ProductName", new String("Power Bank"));
@@ -45,6 +45,11 @@ public class Tester {
 			htblColNameVal = new Hashtable<>();
 			htblColNameVal.put("ProductName", new String("Updated"));
 			db.updateTable("Product", "1", htblColNameVal);
+			htblColNameVal = new Hashtable<>();
+			htblColNameVal.put("ProductID", new Integer(1));
+			htblColNameVal.put("ProductName", new String("Power Bank"));
+			htblColNameVal.put("ProductPrice", new Double(15.5));
+			db.deleteFromTable("Product",htblColNameVal);
 //			GridIndex index = new GridIndex("Index", "Table", "Employee", "0", "1000", "Worker", "0", "1000");
 //			index.printIndex();
 			System.out.println("Terminated");
