@@ -31,7 +31,7 @@ public class Writer {
 	public static void writePage(String fileName, String[][] page) {
 		StringBuilder content = new StringBuilder();
 		for (int i = 0; i < page.length; i++) {
-			if (page[i][0] == null)
+			if (page[i] == null || page[i][0] == null)
 				break;
 			for (int j = 0; j < page[i].length; j++) {
 				content.append(page[i][j]);

@@ -5,6 +5,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Map;
@@ -13,6 +15,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
+import java.text.DateFormat;
 
 public class DBApp {
 	public static Writer writer;
@@ -294,19 +297,40 @@ public class DBApp {
 				String colType = tableMeta[i][2];
 				String min = tableMeta[i][6];
 				String max = tableMeta[i][7];
-
-				// check for foreign key
-
-				Class colClass = Class.forName(colType);
-				Constructor constructor = colClass.getConstructor(String.class);
-				Object minObj = constructor.newInstance(min);
-				Object maxObj = constructor.newInstance(max);
-
+				String foreign = tableMeta[i][8];
+				// check for foreign key and data type
+				if (foreign.equals("True")) {
+					String foreignTable = tableMeta[i][9];
+					String foreignCol = tableMeta[i][10];
+					if (!checkForForeignKey(foreignTable, foreignCol, value.toString()))
+						throw new DBAppException(
+								value.toString() + " Foreign Key does not exist in table" + foreignTable);
+				}
+				Class colClass;
+				Constructor constructor;
+				Object minObj;
+				Object maxObj;
+				if (colType.equals("java.lang.Date")) {
+					colClass = Date.class;
+					int[] minDate = getDate(min);
+					int[] maxDate = getDate(max);
+					minObj = new Date(minDate[2], minDate[1], minDate[0]);
+					maxObj = new Date(maxDate[2], maxDate[1], maxDate[0]);
+				} else {
+					colClass = Class.forName(colType);
+					constructor = colClass.getConstructor(String.class);
+					minObj = constructor.newInstance(min);
+					maxObj = constructor.newInstance(max);
+				}
+				if (!colClass.equals(value.getClass()))
+					throw new DBAppException(colName + " should be of type " + colType);
 				// comparing control data with input tuple
 				if (((Comparable) value).compareTo(minObj) < 0)
 					throw new DBAppException(colName + " value is less than the minimum value (" + min + ")");
 				if (((Comparable) value).compareTo(maxObj) > 0)
 					throw new DBAppException(colName + " value is greater than the maximum value (" + max + ")");
+				if (colType.equals("java.lang.Date"))
+					value = new String(convertDateFormat(value.toString()));
 				sb.append(value.toString());
 				if (i != tableMeta.length - 1)
 					sb.append(",");
@@ -337,6 +361,68 @@ public class DBApp {
 		return res;
 	}
 
+	// changes date format from default to DD.MM.YYYY
+	public static String convertDateFormat(String dateString) {
+		DateFormat inputFormat = new SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy");
+		DateFormat outputFormat = new SimpleDateFormat("dd.MM.yyyy");
+		try {
+			Date date = inputFormat.parse(dateString);
+			String res = outputFormat.format(date);
+			String[] arr = res.split("\\.");
+			int year = Integer.parseInt(arr[2]) - 1900;
+			int month = Integer.parseInt(arr[1]) - 1;
+			arr[2] = "" + year;
+			arr[1] = "" + month;
+			StringBuilder sb = new StringBuilder();
+			sb.append(arr[0]);
+			sb.append(".");
+			sb.append(arr[1]);
+			sb.append(".");
+			sb.append(arr[2]);
+			return sb.toString();
+		} catch (ParseException e) {
+			e.printStackTrace();
+			return null; // or throw an exception, depending on your use case
+		}
+	}
+
+	// changes date format from DD.MM.YYYY to int[DD, MM, YYYY]
+	public static int[] getDate(String s) {
+		String[] date = s.split("\\.");
+		int[] res = new int[3];
+		res[0] = Integer.parseInt(date[0]);
+		res[1] = Integer.parseInt(date[1]);
+		res[2] = Integer.parseInt(date[2]);
+		return res;
+	}
+
+	// checks if value is present in column colName in the table
+	public static boolean checkForForeignKey(String table, String colName, String value) {
+		Table t = tables.get(table);
+		if (t.hasIndex()) {
+			return false;
+		}
+		// if no index is created
+		// loop on all pages and compare the value with the tuples
+		for (int i = 0; i < t.getPages().size(); i++) {
+			String[][] page = reader.readCSV(t.getPages().get(i).getPath());
+			String[] header = page[0];
+			int col;
+			for (col = 0; col < header.length; col++) {
+				if (header[col].equals(colName)) {
+					break;
+				}
+			}
+			for (int j = 1; j < page.length; j++) {
+				if (page[j][col].equals(value)) {
+					return true;
+				}
+			}
+		}
+		return false;
+
+	}
+
 	public void updateTable(String strTableName, String strClusteringKeyValue,
 			Hashtable<String, Object> htblColNameValue) throws DBAppException {
 		// search for the tuple using its clustering value
@@ -357,8 +443,11 @@ public class DBApp {
 				// find changed values and change them in the tuple
 				for (int i = 0; i < header.length; i++) {
 					if (htblColNameValue.containsKey(header[i])) {
+						String oldVal = tuple[i];
 						// change its value in the tuple
 						tuple[i] = htblColNameValue.get(header[i]).toString();
+						// check if it is a foreign key in another table
+						updateForeign(header[i], tuple[i], oldVal);
 					}
 				}
 				// write the updated tuple back to the table
@@ -366,6 +455,32 @@ public class DBApp {
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
+		}
+	}
+
+	public static void updateForeign(String colName, String newVal, String oldVal) {
+		String[][] metaData = reader.readCSV("metadata.csv");
+		for (int i = 1; i < metaData.length; i++) {
+			if (metaData[i][1].equals(colName) && metaData[i][8].equals("True")) {
+				String tableName = metaData[i][0];
+				Table table = tables.get(tableName);
+				for (int j = 0; j < table.getPages().size(); j++) {
+					String[][] page = reader.readCSV(table.getPages().get(j).getPath());
+					int col = 0;
+					for (int k = 0; k < page.length; k++) {
+						if (k == 0) {
+							String[] header = page[0];
+							for (col = 0; col < header.length; col++) {
+								if (header[col].equals(colName))
+									break;
+							}
+						} else if (page[k][col].equals(oldVal)) {
+							page[k][col] = newVal;
+							writeUpdatedTuple(table, page[k]);
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -390,6 +505,7 @@ public class DBApp {
 	}
 
 	// searches linearly through all pages of the table to find the requested tuple
+	// returns header and tuple
 	public static String[][] findTuple(Table table, String strClusteringKeyValue) throws DBAppException {
 		String[][] res;
 		for (int i = 0; i < table.getPages().size(); i++) {
@@ -421,30 +537,31 @@ public class DBApp {
 			} else {
 				// if no index is created on the table
 				// search linearly through the entire table to find the required tuple/tuples
-				String[][] res;
-				String[][] res1;
-				int k = 0;
-				int index = 0;
 				for (int i = 0; i < curTable.getPages().size(); i++) {
 					String[][] page = reader.readCSV(curTable.getPages().get(i).getPath());
-					res = new String[page.length][2];
+					String[] header = page[0];
 					int clusterColIndex = 0;
-					System.out.println("he");
-					for (int h = 0; h < page[0].length; h++) {
-						if (curTable.getClusterCol().equals(page[0][h]))
+					for (int h = 0; h < header.length; h++) {
+						if (curTable.getClusterCol().equals(header[h]))
 							clusterColIndex = h;
 					}
-					for (int j = 1; j < page.length; j++) {// loop till i know which one is in the deletion list get the
-															// index from it
-						if (htblColNameValue.containsValue(j)) {
-							index = j;
+					for (int j = 1; j < page.length; j++) {
+						// loop till i know which one is in the deletion list get the
+						// index from it
+						for (int k = 0; k < page[j].length; k++) {
 
+							// need to check for all input columns before deletion
+
+							if (htblColNameValue.containsKey(header[k])) {
+								Class colClass = htblColNameValue.get(header[k]).getClass();
+								Constructor constructor = colClass.getConstructor(String.class);
+								Object val = constructor.newInstance(page[j][k]);
+								if (htblColNameValue.get(header[k]).equals(val))
+									shiftupTuples(curTable, i, j);
+							}
 						}
 					}
-
 				}
-				shiftupTuples(curTable, index);
-
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -453,35 +570,25 @@ public class DBApp {
 	}
 
 	// shift tuples in the table for deletion method
-	public static String[][] shiftupTuples(Table table, int index) {//<------------------doesnt make the last attribute empty
-		int page_num = index / 200;// to get the page of the deleted info
-		int Req_row = index + 1;
-		if (page_num > 0) {
-			Req_row = (index + 1) - ((200 * (page_num - 1)) - 1);// to get the row of the info will be deleted
-		}
-		String[][] page = reader.readCSV(table.getPages().get(page_num).getPath());
-		if (page.length > 2) {// first reserved for the labels and the second for the first and only attribute
-								// which will be deleted
-			for (int i = 1; i < page.length; i++) {
-				if (i == Req_row) {
-					for (int j = Req_row; j < page.length - 1; j++) {// shift from the required row till the end
-						System.out.println(Arrays.toString(page[j]) + "" + "before");
-						page[j] = page[j + 1];
-						System.out.println(Arrays.toString(page[j]) + "" + "after");
-					}
-					break;
-				}
+	public static String[][] shiftupTuples(Table table, int pageNum, int index) {// <------------------doesnt make the
+																					// last attribute
+		// empty
+		int Req_row = index;
+		String[][] page = reader.readCSV(table.getPages().get(pageNum).getPath());
+		if (page.length > 2) {
+			// first reserved for the labels and the second for the first and only attribute
+			// which will be deleted
+			int j;
+			for (j = Req_row; j < page.length - 1; j++) {// shift from the required row till the end
+				page[j] = page[j + 1];
 			}
-			String filePath = table.getPages().get(page_num).getPath();
+			page[page.length - 1] = null;
+			String filePath = table.getPages().get(pageNum).getPath();
 			writer.writePage(filePath, page);
-
-		}
-		else {
+		} else {
 			try {
-				Path path = Paths.get(table.getPages().get(page_num).getPath());
+				Path path = Paths.get(table.getPages().get(pageNum).getPath());
 				Files.delete(path);
-				System.out.println(path);
-				System.out.println("File deleted successfully.");
 			} catch (IOException e) {
 				System.out.println("An error occurred while deleting the file: " + e.getMessage());
 			}

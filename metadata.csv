@@ -2,3 +2,8 @@ TableName,ColumnName,ColumnType,ClusteringKey,IndexName,IndexType,min,max,Foreig
 Product,ProductID,java.lang.Integer,True,null,null,0,1000,False,null,null,False
 Product,ProductPrice,java.lang.Double,False,null,null,0,100000,False,null,null,False
 Product,ProductName,java.lang.String,False,null,null,A,ZZZZZZZZ,False,null,null,False
+Sale,TotalAmount,java.lang.Double,False,null,null,0,1000000000,False,null,null,False
+Sale,ProductID,java.lang.Integer,False,null,null,0,1000,True,Product,ProductID,False
+Sale,SaleID,java.lang.Integer,True,null,null,0,10000,False,null,null,False
+Sale,SaleDate,java.lang.Date,False,null,null,01.01.2000,31.12.2030,False,null,null,False
+Sale,Quantity,java.lang.Integer,False,null,null,1,10000,False,null,null,False
