@@ -44,10 +44,9 @@ public class Tester {
 				htblColNameVal.put("ProductPrice", new Double(15.5));
 				db.insertIntoTable("Product", htblColNameVal);
 			}
-
 			
-//			GridIndex index = new GridIndex("Index", "Table", "Employee", "0", "1000", "Worker", "0", "1000");
-//			index.printIndex();
+			String[] indexCols = {"ProductID", "ProductPrice"};
+			db.createIndex("Product", indexCols);
 			
 			htblColNameType = new Hashtable<>();
 			htblColNameType.put("SaleID", "java.lang.Integer");
@@ -80,21 +79,21 @@ public class Tester {
 				htblColNameVal.put("TotalAmount", new Double(i + 200));
 				db.insertIntoTable("Sale", htblColNameVal);
 			}			
-			htblColNameVal = new Hashtable<>();
-			htblColNameVal.put("ProductID", new Integer(1));
-			db.deleteFromTable("Product",htblColNameVal);
-			
-			SQLTerm[] arrsqlSqlTerms = new SQLTerm[2];
-			arrsqlSqlTerms[0] = new SQLTerm("Sale", "TotalAmount", ">", new Double(250));
-			arrsqlSqlTerms[1] = new SQLTerm("Sale", "Quantity", ">", new Integer(3));
-			String[] operators = new String[1];
-			operators[0] = "AND";
-			Iterator resultSet = db.selectFromTable(arrsqlSqlTerms, operators);
-			System.out.println();
-			while (resultSet.hasNext()) {
-				System.out.println(db.convertToString((String[]) resultSet.next()));
-			}
-			
+//			htblColNameVal = new Hashtable<>();
+//			htblColNameVal.put("ProductID", new Integer(1));
+//			db.deleteFromTable("Product",htblColNameVal);
+//			
+//			SQLTerm[] arrsqlSqlTerms = new SQLTerm[2];
+//			arrsqlSqlTerms[0] = new SQLTerm("Sale", "TotalAmount", ">", new Double(250));
+//			arrsqlSqlTerms[1] = new SQLTerm("Sale", "Quantity", ">", new Integer(3));
+//			String[] operators = new String[1];
+//			operators[0] = "AND";
+//			Iterator resultSet = db.selectFromTable(arrsqlSqlTerms, operators);
+//			while (resultSet.hasNext()) {
+//				System.out.println(db.convertToString((String[]) resultSet.next()));
+//			}
+			Object x = new String("hello");
+			System.out.println(GridIndex.incrementObject(x, 3));
 			System.out.println("Terminated");
 		} catch (DBAppException e) {
 			// TODO Auto-generated catch block

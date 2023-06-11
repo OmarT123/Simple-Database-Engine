@@ -11,11 +11,13 @@ public class Table{
 	private String path;
 	private boolean hasIndex;
 	private String clusterCol;
+	private ArrayList<File> indecies;
 	
 	public Table(String name, String clusterCol) {
 		this.name = name;
 		this.clusterCol = clusterCol;
 		this.pages = new ArrayList<>();
+		this.indecies = new ArrayList<>();
 		String folderName = name;
 		this.path = System.getProperty("user.dir");
 		File folder = new File(this.path + File.separator + folderName);
@@ -33,6 +35,14 @@ public class Table{
 		this.hasIndex = false;
  	}
 	
+	public ArrayList<File> getIndecies() {
+		return indecies;
+	}
+
+	public void setIndecies(ArrayList<File> indecies) {
+		this.indecies = indecies;
+	}
+
 	public String getClusterCol() {
 		return clusterCol;
 	}

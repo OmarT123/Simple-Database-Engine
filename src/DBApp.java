@@ -104,7 +104,27 @@ public class DBApp {
 	public void createIndex(String strTableName, String[] strarrColName) throws DBAppException {
 		if (strarrColName.length != 2)
 			throw new DBAppException("Two columns required to create an index");
-
+		if (!tables.containsKey(strTableName))
+			throw new DBAppException(strTableName + " Table does not exist");
+		Table t = tables.get(strTableName);
+		String indName = strarrColName[0] + "_" + strarrColName[1] + "_index" + ".csv";
+		for (int i = 0; i < t.getIndecies().size(); i++) {
+			if (indName.equals(t.getIndecies().get(i).getName()))
+				throw new DBAppException(indName + " Index already exists");
+		}
+		String[][] metaData = reader.readCSV("metadata.csv");
+		String[][] tableMeta = reader.readTableMeta(metaData, strTableName);
+		String min1 = "", max1 = "", min2 = "", max2 = "", col1 = "", col2 = "";
+		for (int i = 0; i < tableMeta.length; i++) {
+			if (tableMeta[i][1].equals(strarrColName[0])) {
+				min1 = tableMeta[i][6];
+				max1 = tableMeta[i][7];
+			} else if (tableMeta[i][1].equals(strarrColName[1])) {
+				min2 = tableMeta[i][6];
+				max2 = tableMeta[i][7];
+			}
+		}
+		//new GridIndex(indName, t, col1, strarrColName[0], min1, max1, col2, strarrColName[1], min2, max2);
 	}
 
 	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException {
