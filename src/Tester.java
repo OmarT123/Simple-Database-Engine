@@ -45,9 +45,7 @@ public class Tester {
 				db.insertIntoTable("Product", htblColNameVal);
 			}
 
-			htblColNameVal = new Hashtable<>();
-			htblColNameVal.put("ProductID", new Integer(200));
-			db.deleteFromTable("Product",htblColNameVal);
+			
 //			GridIndex index = new GridIndex("Index", "Table", "Employee", "0", "1000", "Worker", "0", "1000");
 //			index.printIndex();
 			
@@ -73,19 +71,29 @@ public class Tester {
 			String[] computed = new String[1];
 			db.createTable("Sale", "SaleID", htblColNameType, htblColNameMin, htblColNameMax, htblForeignKeys, computed);
 			
-//			for (int i = 0; i < 100; i++) {
-//				htblColNameVal = new Hashtable<>();
-//				htblColNameVal.put("SaleID", new Integer(i));
-//				htblColNameVal.put("SaleDate", new Date(2023, 21, 3));
-//				htblColNameVal.put("ProductID", new Integer(i));
-//				htblColNameVal.put("Quantity", new Integer(10));
-//				htblColNameVal.put("TotalAmount", new Double(100));
-//				db.insertIntoTable("Sale", htblColNameVal);
-//			}
+			for (int i = 0; i < 100; i++) {
+				htblColNameVal = new Hashtable<>();
+				htblColNameVal.put("SaleID", new Integer(i));
+				htblColNameVal.put("SaleDate", new Date(2023, 21, 3));
+				htblColNameVal.put("ProductID", new Integer(i));
+				htblColNameVal.put("Quantity", new Integer(i + 1));
+				htblColNameVal.put("TotalAmount", new Double(i + 200));
+				db.insertIntoTable("Sale", htblColNameVal);
+			}			
+			htblColNameVal = new Hashtable<>();
+			htblColNameVal.put("ProductID", new Integer(1));
+			db.deleteFromTable("Product",htblColNameVal);
 			
-//			htblColNameVal = new Hashtable<>();
-//			htblColNameVal.put("ProductID", new Integer(600));
-//			db.updateTable("Product", "1", htblColNameVal);
+			SQLTerm[] arrsqlSqlTerms = new SQLTerm[2];
+			arrsqlSqlTerms[0] = new SQLTerm("Sale", "TotalAmount", ">", new Double(250));
+			arrsqlSqlTerms[1] = new SQLTerm("Sale", "Quantity", ">", new Integer(3));
+			String[] operators = new String[1];
+			operators[0] = "AND";
+			Iterator resultSet = db.selectFromTable(arrsqlSqlTerms, operators);
+			System.out.println();
+			while (resultSet.hasNext()) {
+				System.out.println(db.convertToString((String[]) resultSet.next()));
+			}
 			
 			System.out.println("Terminated");
 		} catch (DBAppException e) {

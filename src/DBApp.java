@@ -440,6 +440,8 @@ public class DBApp {
 				String[] header = headerAndTuple[0];
 				String[] tuple = headerAndTuple[1];
 
+				// validate the input
+
 				// find changed values and change them in the tuple
 				for (int i = 0; i < header.length; i++) {
 					if (htblColNameValue.containsKey(header[i])) {
@@ -598,9 +600,168 @@ public class DBApp {
 	}// <--------------------------------------------------------------------------------------------------------------------------------------------------------->
 
 	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
+		if (arrSQLTerms.length == 0)
+			throw new DBAppException("No parameters passed");
+		if (arrSQLTerms.length != 1 && strarrOperators.length != arrSQLTerms.length - 1)
+			throw new DBAppException("Insufficient parameters");
+		if (!tables.containsKey(arrSQLTerms[0].get_strTableName()))
+			throw new DBAppException(arrSQLTerms[0].get_strTableName() + " table does not exist");
+		for (int i = 0; strarrOperators != null && i < strarrOperators.length; i++) {
+			if (!strarrOperators[i].equals("AND") && !strarrOperators[i].equals("OR"))
+				throw new DBAppException(
+						strarrOperators[i] + " is not a supported operator (only AND and OR are supported)");
+		}
+		Table t = tables.get(arrSQLTerms[0].get_strTableName());
+		if (t.getPages().size() == 0)
+			return null;
+		if (t.hasIndex()) {
+
+		} else {
+			// if no index is created on the table
+			try {
+				LinkedList<LinkedList<String[]>> SQLres = new LinkedList<>();
+				String[] supportedOperators = { ">", ">=", "<", "<=", "=" };
+
+				// read the metadata associated with the table
+				String tableName = t.getName();
+				String[][] metadata = reader.readCSV("metadata.csv");
+				String[][] tableMeta = reader.readTableMeta(metadata, tableName);
+				String[] header = null;
+				for (int i = 0; i < arrSQLTerms.length; i++) {
+					// read sql term and validate its object type store it in the arrayList
+					SQLTerm cur = arrSQLTerms[i];
+					String colName = cur.get_strColumnName();
+					String operator = cur.get_strOperator();
+					Object value = cur.get_objValue();
+					// read metadata to find out the data type of the column
+					// validate that the value is of that type
+					// check if operator is one of the supported operators
+					if (!listContains(operator, supportedOperators))
+						throw new DBAppException(operator + " is not a supported operator");
+					String type = "";
+					Class colClass = null;
+					for (int j = 0; j < tableMeta.length; j++) {
+						if (tableMeta[j][1].equals(colName)) {
+
+							// handle the date case
+
+							type = tableMeta[j][2];
+							colClass = Class.forName(type);
+							if (!colClass.equals(value.getClass()))
+								throw new DBAppException("Incompatible data types");
+							break;
+						}
+					}
+					for (int j = 0; j < t.getPages().size(); j++) {
+						String[][] page = reader.readCSV(t.getPages().get(j).getPath());
+						header = page[0];
+						int index = 0;
+						for (index = 0; index < header.length; index++) {
+							if (header[index].equals(colName))
+								break;
+						}
+						LinkedList<String[]> res = new LinkedList<>();
+						for (int row = 1; row < page.length; row++) {
+							String[] tuple = page[row];
+							if (checkCondition(tuple[index], operator, value, type))
+								res.add(tuple);
+						}
+						SQLres.add(res);
+					}
+					int opIndex = 0;
+					String clusterCol = t.getClusterCol();
+					int clusterIndex = 0;
+					for (int w = 0; w < header.length; w++) {
+						if (header[w].equals(clusterCol))
+							clusterIndex = w;
+					}
+					while (SQLres.size() > 1) {
+						LinkedList<String[]> first = SQLres.removeFirst();
+						LinkedList<String[]> second = SQLres.removeFirst();
+						LinkedList<String[]> result = new LinkedList<>();
+						String sqlOperator = strarrOperators[opIndex++];
+						Constructor constructor = colClass.getConstructor(String.class);
+						if (sqlOperator.equals("AND")) {
+							int a = 0;
+							int b = 0;
+							while (a < first.size() && b < second.size()) {
+								Object f = constructor.newInstance(first.get(a)[clusterIndex]);
+								Object s = constructor.newInstance(second.get(b)[clusterIndex]);
+								if (((Comparable) f).compareTo(s) < 0) {
+									a++;
+								} else if (((Comparable) f).compareTo(s) > 0) {
+									b++;
+								} else {
+									result.add(first.get(a));
+									a++;
+									b++;
+								}
+							}
+						} else {
+							int a = 0;
+							int b = 0;
+							while (a < first.size() && b < second.size()) {
+								Object f = constructor.newInstance(first.get(a)[clusterIndex]);
+								Object s = constructor.newInstance(second.get(b)[clusterIndex]);
+								if (((Comparable) f).compareTo(s) < 0) {
+									result.add(first.get(a));
+									a++;
+								} else if (((Comparable) f).compareTo(s) > 0) {
+									result.add(second.get(b));
+									b++;
+								} else {
+									result.add(first.get(a));
+									a++;
+									b++;
+								}
+							}
+						}
+						SQLres.addFirst(result);
+					}
+				}
+				SQLres.getFirst().addFirst(header);
+				return SQLres.getFirst().iterator();
+			} catch (ClassNotFoundException | SecurityException | NoSuchMethodException | InstantiationException
+					| IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 		return null;
 	}
 
+	public static boolean checkCondition(String tupleValue, String operator, Object value, String type)
+			throws ClassNotFoundException, NoSuchMethodException, SecurityException, InstantiationException,
+			IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+		Class colClass = Class.forName(type);
+		Constructor constructor = colClass.getConstructor(String.class);
+		Object tupleVal = constructor.newInstance(tupleValue);
+		switch (operator) {
+		case ">":
+			if (((Comparable) tupleVal).compareTo(value) > 0)
+				return true;
+			break;
+		case ">=":
+			if (((Comparable) tupleVal).compareTo(value) >= 0)
+				return true;
+			break;
+		case "<=":
+			if (((Comparable) tupleVal).compareTo(value) <= 0)
+				return true;
+			break;
+		case "<":
+			if (((Comparable) tupleVal).compareTo(value) < 0)
+				return true;
+			break;
+		case "=":
+			if (((Comparable) tupleVal).compareTo(value) == 0)
+				return true;
+			break;
+		}
+		return false;
+	}
+
+	// prints a 2d array of strings
 	public static void printGrid(String[][] grid) {
 		for (String[] row : grid) {
 			if (row[0] == null)
@@ -612,6 +773,7 @@ public class DBApp {
 		}
 	}
 
+	// prints an array of strings
 	public static void printArray(String[] arr) {
 		for (String s : arr) {
 			System.out.print(s + " ");
