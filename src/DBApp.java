@@ -32,7 +32,7 @@ public class DBApp {
 		writer = new Writer();
 		reader = new Reader();
 		tables = new Hashtable<>();
-		deserializeAll();
+		//deserializeAll();
 		if (tables.isEmpty())
 			createMetaDataHeader();
 
@@ -57,7 +57,7 @@ public class DBApp {
 			Hashtable<String, String> htblColNameMax, Hashtable<String, String> htblForeignKeys, String[] computedCols)
 			throws DBAppException {
 		Table t = new Table(strTableName, strClusteringKeyColumn);
-		serialize(t);
+		//serialize(t);
 		String csvFilePath = "metadata.csv";
 		ArrayList<String> arrayList = new ArrayList<>();
 		Iterator<Map.Entry<String, String>> iterator = htblColNameType.entrySet().iterator();
@@ -147,7 +147,8 @@ public class DBApp {
 		try {
 			GridIndex grid = new GridIndex(indName, t, col1, strarrColName[0], min1, max1, col2, strarrColName[1], min2,
 					max2);
-			serialize(grid);
+			//serialize(grid);
+			grid.getOnTable().getIndecies().add(grid);
 			t.setHasIndex(true);
 		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException
 				| InvocationTargetException | NoSuchMethodException | SecurityException e) {
@@ -170,8 +171,22 @@ public class DBApp {
 			Class colClass = Class.forName(clusteringType);
 			Constructor constructor = colClass.getConstructor(String.class);
 			Object clusterVal = constructor.newInstance(clusteringVal);
-			if (curTable.hasIndex()) {
-				// if an index is created on the table
+			int pageReq = -1;
+			String[] header = null;
+			boolean indexOnCluster = false;
+//			for (int i = 0; i < curTable.getIndecies().size(); i++) {
+//				GridIndex cur = curTable.getIndecies().get(i);
+//				if (cur.getName().contains(clusteringCol))
+//				{
+//					indexOnCluster = true;
+//					break;
+//				}
+//			}
+			if (curTable.hasIndex() && indexOnCluster) {
+				// if an index is created on the table on clustering key
+				// using the gridIndex's get()
+				
+				
 			} else {
 				// No index is created on the table
 				// so insert according to clustering key
@@ -186,13 +201,13 @@ public class DBApp {
 					// iterate over existing pages/tuples to find location of current tuple
 					// shift any other tuples that are below the current tuple
 					int rowReq = -1;
-					int pageReq = -1;
+					pageReq = -1;
 					int row = 1;
 					File firstPage = curTable.getPages().get(0);
 					String filePath = firstPage.getPath();
 					String[][] pageData = reader.readNSizeTable(filePath);
 					int clusterColIndex = 0;
-					String[] header = pageData[0];
+					header = pageData[0];
 					for (int j = 0; j < header.length; j++) {
 						if (header[j].equals(clusteringCol)) {
 							clusterColIndex = j;
@@ -235,6 +250,12 @@ public class DBApp {
 						writer.writePage(filePath, page);
 					}
 				}
+			}
+			// insert pages into grid index
+			for (int i = 0; i < curTable.getIndecies().size(); i++) {
+				System.out.println("entered");
+				GridIndex cur = curTable.getIndecies().get(i);
+				cur.insert(tuple.split(","), header, "Page" + pageReq);
 			}
 		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
 				| ClassNotFoundException | NoSuchMethodException | SecurityException e) {

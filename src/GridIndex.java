@@ -13,15 +13,17 @@ public class GridIndex implements Serializable {
 	private int gridSize;
 
 	public GridIndex(String name, Table table, String colType1, String col1, String min1, String max1, String colType2,
-			String col2, String min2, String max2) throws ClassNotFoundException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
+			String col2, String min2, String max2)
+			throws ClassNotFoundException, InstantiationException, IllegalAccessException, IllegalArgumentException,
+			InvocationTargetException, NoSuchMethodException, SecurityException {
 		// verify table name
 		// verify col names
 		this.name = name;
 		this.onTable = table;
 		this.col1 = col1;
 		this.col2 = col2;
-		this.col1Type = col1Type;
-		this.col2Type = col2Type;
+		this.col1Type = colType1;
+		this.col2Type = colType2;
 		
 		int N = 10; // store grid size in config file
 		this.grid = new String[N + 1][N + 1];
@@ -106,10 +108,10 @@ public class GridIndex implements Serializable {
 			}
 		}
 		Writer.writePage("metadata.csv", metaData);
-		
+
 		// if there are tuples in the table
 		// loop over all of them to fill the grid index
-		
+
 		ArrayList<String[]> column1 = new ArrayList<>();
 		ArrayList<String[]> column2 = new ArrayList<>();
 		for (int i = 1; i < this.grid.length; i++) {
@@ -122,10 +124,8 @@ public class GridIndex implements Serializable {
 		Class colClass2 = Class.forName(colType2);
 		Constructor constructor1 = colClass1.getConstructor(String.class);
 		Constructor constructor2 = colClass2.getConstructor(String.class);
-		
+
 		for (int i = 0; i < onTable.getPages().size(); i++) {
-			int indexedRow;
-			int indexedColumn;
 			String[][] page = Reader.readCSV(onTable.getPages().get(i).getPath());
 			String[] header = page[0];
 			int col1Index = 0;
@@ -146,24 +146,26 @@ public class GridIndex implements Serializable {
 					Object max2Val = constructor2.newInstance(column2.get(index)[1]);
 					Object min1Val = constructor1.newInstance(column1.get(index)[0]);
 					Object min2Val = constructor2.newInstance(column2.get(index)[0]);
-					if (((Comparable) max1Val).compareTo(col1Val) >= 0 && ((Comparable) min1Val).compareTo(col1Val) <= 0) {
+					if (((Comparable) max1Val).compareTo(col1Val) >= 0
+							&& ((Comparable) min1Val).compareTo(col1Val) <= 0) {
 						indexInGrid[0] = index + 1;
 					}
-					if (((Comparable) max2Val).compareTo(col2Val) >= 0 && ((Comparable) min2Val).compareTo(col2Val) <= 0) {
+					if (((Comparable) max2Val).compareTo(col2Val) >= 0
+							&& ((Comparable) min2Val).compareTo(col2Val) <= 0) {
 						indexInGrid[1] = index + 1;
 					}
 					index++;
 				}
-				
+
 //				System.out.println("row: " + indexInGrid[1]);
 //				System.out.println("col: " + indexInGrid[0]);
 				if (indexInGrid[0] == 0)
 					System.out.println(onTable.getPages().get(i).getName());
-				
+
 				if (grid[indexInGrid[1]][indexInGrid[0]] == null)
 					grid[indexInGrid[1]][indexInGrid[0]] = onTable.getPages().get(i).getName();
 				else if (!grid[indexInGrid[1]][indexInGrid[0]].contains(onTable.getPages().get(i).getName()))
-					grid[indexInGrid[1]][indexInGrid[0]] += "-" + onTable.getPages().get(i).getName();	
+					grid[indexInGrid[1]][indexInGrid[0]] += "-" + onTable.getPages().get(i).getName();
 			}
 		}
 //		for (int a = 0; a < grid.length; a++) {
@@ -275,7 +277,7 @@ public class GridIndex implements Serializable {
 		}
 		return input;
 	}
-	
+
 	// Not needed (Only for testing)
 	public void saveIndex() {
 		String filePath = getName() + ".csv";
@@ -283,9 +285,11 @@ public class GridIndex implements Serializable {
 	}
 
 	// methods: insert, get, remove, contains
-	
-	public void insert(String[] tuple, String pageName) throws ClassNotFoundException, NoSuchMethodException, SecurityException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-		
+
+	public void insert(String[] tuple, String[] header, String pageReq)
+			throws ClassNotFoundException, NoSuchMethodException, SecurityException, InstantiationException,
+			IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+
 		ArrayList<String[]> column1 = new ArrayList<>();
 		ArrayList<String[]> column2 = new ArrayList<>();
 		for (int i = 1; i < this.grid.length; i++) {
@@ -294,48 +298,45 @@ public class GridIndex implements Serializable {
 			minMaxPair = grid[i][0].split("-");
 			column2.add(minMaxPair);
 		}
-		
-		Class colClass1 = Class.forName(col1Type);
+
+		System.out.println(this.col2);
+		Class colClass1 = Class.forName(this.col1Type);
 		Class colClass2 = Class.forName(col2Type);
 		Constructor constructor1 = colClass1.getConstructor(String.class);
 		Constructor constructor2 = colClass2.getConstructor(String.class);
-		
-			int indexedRow;
-			int indexedColumn;
-			String[][] page = Reader.readCSV(onTable.getPages().get(0).getPath());
-			String[] header = page[0];
-			int col1Index = 0;
-			int col2Index = 0;
-			for (int j = 0; j < header.length; j++) {
-				if (col1.equals(header[j]))
-					col1Index = j;
-				if (col2.equals(header[j]))
-					col2Index = j;
+		int col1Index = 0;
+		int col2Index = 0;
+		for (int j = 0; j < header.length; j++) {
+			if (col1.equals(header[j]))
+				col1Index = j;
+			if (col2.equals(header[j]))
+				col2Index = j;
+		}
+
+		Object col1Val = constructor1.newInstance(tuple[col1Index]);
+		Object col2Val = constructor2.newInstance(tuple[col2Index]);
+		int[] indexInGrid = new int[2];
+		int index = 0;
+		while (index < column1.size()) {
+			Object max1Val = constructor1.newInstance(column1.get(index)[1]);
+			Object max2Val = constructor2.newInstance(column2.get(index)[1]);
+			Object min1Val = constructor1.newInstance(column1.get(index)[0]);
+			Object min2Val = constructor2.newInstance(column2.get(index)[0]);
+			if (((Comparable) max1Val).compareTo(col1Val) >= 0
+					&& ((Comparable) min1Val).compareTo(col1Val) <= 0) {
+				indexInGrid[0] = index + 1;
 			}
-			
-				Object col1Val = constructor1.newInstance(tuple[col1Index]);
-				Object col2Val = constructor2.newInstance(tuple[col2Index]);
-				int[] indexInGrid = new int[2];
-				int index = 0;
-				while (index < column1.size()) {
-					Object cur1 = constructor1.newInstance(column1.get(index)[1]);
-					Object cur2 = constructor2.newInstance(column2.get(index)[1]);
-					if (((Comparable) cur1).compareTo(col1Val) >= 0) {
-						indexInGrid[0] = index + 1;
-					}
-					if (((Comparable) cur2).compareTo(col2Val) >= 0) {
-						System.out.println("entered");
-						indexInGrid[1] = index + 1;
-					}
-					index++;
-					break;
-				}
-				
-//				if (grid[indexInGrid[1]][indexInGrid[0]] == null)
-//					grid[indexInGrid[1]][indexInGrid[0]] = onTable.getPages().get(i).getName();
-//				else if (!grid[indexInGrid[1]][indexInGrid[0]].contains(onTable.getPages().get(i).getName()))
-//					grid[indexInGrid[1]][indexInGrid[0]] += "," + onTable.getPages().get(i).getName();	
-			
-		
+			if (((Comparable) max2Val).compareTo(col2Val) >= 0
+					&& ((Comparable) min2Val).compareTo(col2Val) <= 0) {
+				indexInGrid[1] = index + 1;
+			}
+			index++;
+		}
+
+		if (grid[indexInGrid[1]][indexInGrid[0]] == null)
+			grid[indexInGrid[1]][indexInGrid[0]] = pageReq;
+		else if (!grid[indexInGrid[1]][indexInGrid[0]].contains(pageReq))
+			grid[indexInGrid[1]][indexInGrid[0]] += "-" + pageReq;
+		saveIndex();
 	}
 }
