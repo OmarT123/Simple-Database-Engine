@@ -1,4 +1,6 @@
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.lang.constant.Constable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -12,21 +14,36 @@ import java.util.Iterator;
 import java.util.Map;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 import java.text.DateFormat;
 
 public class DBApp {
-	public static Writer writer;
-	public static Reader reader;
-	public static Hashtable<String, Table> tables;
+	static Writer writer;
+	static Reader reader;
+	static Hashtable<String, Table> tables;
+	static int maxTableSize;
 
 	public static void init() {
 		writer = new Writer();
 		reader = new Reader();
 		tables = new Hashtable<>();
-		createMetaDataHeader();
+		deserializeAll();
+		if (tables.isEmpty())
+			createMetaDataHeader();
+
+		Properties properties = new Properties();
+		try (FileReader reader = new FileReader("DBApp.config")) {
+			properties.load(reader);
+			String value1 = properties.getProperty("MaximumRowsCountinTablePage");
+			maxTableSize = Integer.parseInt(value1);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public static void createMetaDataHeader() {
@@ -40,6 +57,7 @@ public class DBApp {
 			Hashtable<String, String> htblColNameMax, Hashtable<String, String> htblForeignKeys, String[] computedCols)
 			throws DBAppException {
 		Table t = new Table(strTableName, strClusteringKeyColumn);
+		serialize(t);
 		String csvFilePath = "metadata.csv";
 		ArrayList<String> arrayList = new ArrayList<>();
 		Iterator<Map.Entry<String, String>> iterator = htblColNameType.entrySet().iterator();
@@ -106,12 +124,12 @@ public class DBApp {
 			throw new DBAppException("Two columns required to create an index");
 		if (!tables.containsKey(strTableName))
 			throw new DBAppException(strTableName + " Table does not exist");
+
 		Table t = tables.get(strTableName);
-		String indName = strarrColName[0] + "_" + strarrColName[1] + "_index" + ".csv";
-		for (int i = 0; i < t.getIndecies().size(); i++) {
-			if (indName.equals(t.getIndecies().get(i).getName()))
-				throw new DBAppException(indName + " Index already exists");
-		}
+		String indName = strarrColName[0] + "_" + strarrColName[1] + "_index";
+
+		// check if index already created
+
 		String[][] metaData = reader.readCSV("metadata.csv");
 		String[][] tableMeta = reader.readTableMeta(metaData, strTableName);
 		String min1 = "", max1 = "", min2 = "", max2 = "", col1 = "", col2 = "";
@@ -119,12 +137,23 @@ public class DBApp {
 			if (tableMeta[i][1].equals(strarrColName[0])) {
 				min1 = tableMeta[i][6];
 				max1 = tableMeta[i][7];
+				col1 = tableMeta[i][2];
 			} else if (tableMeta[i][1].equals(strarrColName[1])) {
 				min2 = tableMeta[i][6];
 				max2 = tableMeta[i][7];
+				col2 = tableMeta[i][2];
 			}
 		}
-		//new GridIndex(indName, t, col1, strarrColName[0], min1, max1, col2, strarrColName[1], min2, max2);
+		try {
+			GridIndex grid = new GridIndex(indName, t, col1, strarrColName[0], min1, max1, col2, strarrColName[1], min2,
+					max2);
+			serialize(grid);
+			t.setHasIndex(true);
+		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException
+				| InvocationTargetException | NoSuchMethodException | SecurityException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException {
@@ -191,7 +220,7 @@ public class DBApp {
 					}
 					// shift tuples if required
 					String[][] page = reader.readNSizeTable(curTable.getPages().get(pageReq).getPath());
-					if (rowReq >= 201) {
+					if (rowReq >= maxTableSize + 1) {
 						filePath = curTable.getPath() + "Page" + (curTable.getPages().size() + 1) + ".csv";
 						createPage(curTable, filePath);
 						writer.appendToFile(filePath, tuple);
@@ -230,17 +259,15 @@ public class DBApp {
 					String[][] prevPage = reader.readNSizeTable(table.getPages().get(i - 1).getPath());
 					String filePath = table.getPath() + "Page" + (table.getPages().size() + 1) + ".csv";
 
-					// get 201 from metadata
-
-					pageContent[1] = prevPage[200];
+					pageContent[1] = prevPage[maxTableSize];
 					writer.writePage(filePath, pageContent);
-				} else if (j == 200 && i == table.getPages().size() - 1) {
+				} else if (j == maxTableSize && i == table.getPages().size() - 1) {
 					// if at the last tuple of the last page
 					// need to create a new page and shift into it
 					String filePath = table.getPath() + "Page" + (table.getPages().size() + 1) + ".csv";
 					createPage(table, filePath);
 					writer.appendToFile(filePath, convertToString(pageContent[j]));
-				} else if (j < 200) {
+				} else if (j < maxTableSize) {
 					// regular case
 					// normal shifting
 					while (j >= row) {
@@ -810,5 +837,62 @@ public class DBApp {
 				sb.append(",");
 		}
 		return sb.toString();
+	}
+
+	public static void serialize(Table t) {
+		try {
+			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(t.getName() + ".ser"));
+			out.writeObject(t);
+			out.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static void serialize(GridIndex g) {
+		try {
+			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(System.getProperty("user.dir") + File.separator+ "_Indecies" + File.separator + g.getName() + ".ser"));
+			out.writeObject(g);
+			out.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static void deserializeAll() {
+		File folder = new File(System.getProperty("user.dir"));
+		File[] files = folder.listFiles();
+		for (File file : files) {
+			if (file.isFile() && file.getName().endsWith(".ser")) {
+				try {
+					ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));
+					Table obj = (Table) in.readObject();
+					tables.put(obj.getName(), obj);
+					String filePath = System.getProperty("user.dir") + File.separator + obj.getName();
+					// load pages
+					File tableFolder = new File(filePath);
+					File[] tableFiles = tableFolder.listFiles();
+					for (File f : tableFiles) {
+						obj.getPages().add(f);
+					}
+					in.close();
+				} catch (IOException | ClassNotFoundException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		folder = new File(System.getProperty("user.dir") + File.separator + "_Indecies");
+		files = folder.listFiles();
+		for (File file : files) {
+			if (file.isFile() && file.getName().endsWith(".ser")) {
+				try {
+					ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));
+					GridIndex obj = (GridIndex) in.readObject();
+					obj.getOnTable().getIndecies().add(obj);
+				} catch (IOException | ClassNotFoundException e) {
+					e.printStackTrace();
+				}
+			}
+		}
 	}
 }

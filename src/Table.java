@@ -1,18 +1,19 @@
 import java.io.File;
+import java.io.Serializable;
 import java.util.ArrayList;
 
 import javax.swing.text.AttributeSet;
 import javax.swing.text.html.HTML.Tag;
 import javax.swing.text.html.HTMLDocument.Iterator;
 
-public class Table{
+public class Table implements Serializable {
 	private String name;
 	private ArrayList<File> pages;
 	private String path;
 	private boolean hasIndex;
 	private String clusterCol;
-	private ArrayList<File> indecies;
-	
+	private ArrayList<GridIndex> indecies;
+
 	public Table(String name, String clusterCol) {
 		this.name = name;
 		this.clusterCol = clusterCol;
@@ -24,22 +25,23 @@ public class Table{
 		if (!folder.exists()) {
 			boolean created = folder.mkdirs();
 			if (created) {
-				//System.out.println("Folder created successfully.");
+				System.out.println("Folder created successfully.");
 			} else {
-				//System.out.println("Failed to create the folder.");
+				System.out.println("Failed to create the folder.");
 			}
 		} else {
-			//System.out.println("Folder already exists.");
+			System.out.println("Folder already exists.");
 		}
 		this.path += "\\" + name + "\\";
 		this.hasIndex = false;
- 	}
+	}
+
 	
-	public ArrayList<File> getIndecies() {
+	public ArrayList<GridIndex> getIndecies() {
 		return indecies;
 	}
 
-	public void setIndecies(ArrayList<File> indecies) {
+	public void setIndecies(ArrayList<GridIndex> indecies) {
 		this.indecies = indecies;
 	}
 
@@ -51,11 +53,10 @@ public class Table{
 		this.clusterCol = clusterCol;
 	}
 
-	public String getPath()
-	{	
+	public String getPath() {
 		return path;
 	}
-	
+
 	public String getName() {
 		return name;
 	}
