@@ -32,7 +32,7 @@ public class DBApp {
 		writer = new Writer();
 		reader = new Reader();
 		tables = new Hashtable<>();
-		//deserializeAll();
+		// deserializeAll();
 		if (tables.isEmpty())
 			createMetaDataHeader();
 
@@ -57,7 +57,7 @@ public class DBApp {
 			Hashtable<String, String> htblColNameMax, Hashtable<String, String> htblForeignKeys, String[] computedCols)
 			throws DBAppException {
 		Table t = new Table(strTableName, strClusteringKeyColumn);
-		//serialize(t);
+		// serialize(t);
 		String csvFilePath = "metadata.csv";
 		ArrayList<String> arrayList = new ArrayList<>();
 		Iterator<Map.Entry<String, String>> iterator = htblColNameType.entrySet().iterator();
@@ -147,7 +147,7 @@ public class DBApp {
 		try {
 			GridIndex grid = new GridIndex(indName, t, col1, strarrColName[0], min1, max1, col2, strarrColName[1], min2,
 					max2);
-			//serialize(grid);
+			// serialize(grid);
 			grid.getOnTable().getIndecies().add(grid);
 			t.setHasIndex(true);
 		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException
@@ -168,59 +168,54 @@ public class DBApp {
 			String clusteringCol = tupleInfo[1];
 			String clusteringType = tupleInfo[2];
 			String clusteringVal = tupleInfo[3];
+			int clusterColIndex = Integer.parseInt(tupleInfo[5]);
 			Class colClass = Class.forName(clusteringType);
 			Constructor constructor = colClass.getConstructor(String.class);
 			Object clusterVal = constructor.newInstance(clusteringVal);
 			int pageReq = -1;
-			String[] header = null;
+			String[] header = tupleInfo[4].split(",");
 			boolean indexOnCluster = false;
-//			for (int i = 0; i < curTable.getIndecies().size(); i++) {
-//				GridIndex cur = curTable.getIndecies().get(i);
-//				if (cur.getName().contains(clusteringCol))
-//				{
-//					indexOnCluster = true;
-//					break;
-//				}
-//			}
-			if (curTable.hasIndex() && indexOnCluster) {
-				// if an index is created on the table on clustering key
-				// using the gridIndex's get()
-				
-				
-			} else {
-				// No index is created on the table
-				// so insert according to clustering key
-				if (curTable.getPages().isEmpty()) {
-					// Table is currently empty
-					// create a new page and store the first tuple in it
-					String filePath = curTable.getPath() + "Page" + (curTable.getPages().size() + 1) + ".csv";
-					createPage(curTable, filePath);
-					writer.appendToFile(filePath, tuple);
-				} else {
-					// Table already has Pages
-					// iterate over existing pages/tuples to find location of current tuple
-					// shift any other tuples that are below the current tuple
-					int rowReq = -1;
-					pageReq = -1;
-					int row = 1;
-					File firstPage = curTable.getPages().get(0);
-					String filePath = firstPage.getPath();
-					String[][] pageData = reader.readNSizeTable(filePath);
-					int clusterColIndex = 0;
-					header = pageData[0];
-					for (int j = 0; j < header.length; j++) {
-						if (header[j].equals(clusteringCol)) {
-							clusterColIndex = j;
-							break;
+			GridIndex gridIndex = null;
+			for (int i = 0; i < curTable.getIndecies().size(); i++) {
+				GridIndex cur = curTable.getIndecies().get(i);
+				if (cur.getName().contains(clusteringCol)) {
+					indexOnCluster = true;
+					gridIndex = cur;
+					break;
+				}
+			}
+			boolean allNull = true;
+			indexLabel: {
+				if (curTable.hasIndex() && indexOnCluster) {
+					// if an index is created on the table on clustering key
+					// using the gridIndex's get()
+					// check which page the tuple should be inserted in using gridIndex.get()
+					// get the page and insert into it the tuple
+					String[] indexName = gridIndex.getName().split("_");
+					String col1 = indexName[0];
+					String col2 = indexName[1];
+					
+					String[] pageNames = gridIndex.getByCluster(clusteringVal, col1.equals(clusteringCol));
+					ArrayList<String> pages = new ArrayList<>();
+					for (int i = 0; i < pageNames.length; i++) {
+						if (pageNames[i] == null) {
+							continue;
 						}
+						String[] temp = pageNames[i].split("-");
+						for (String s : temp)
+							pages.add(s);
+						allNull = false;
 					}
-					for (int i = 0; i < curTable.getPages().size(); i++) {
-						File curPage = curTable.getPages().get(i);
-						pageData = reader.readNSizeTable(curPage.getPath());
-						for (row = 1; (row < pageData.length) && pageData[row][clusterColIndex] != null; row++) {
+					if (allNull)
+						break indexLabel;
+					int row = -1, rowReq = -1;
+					for (int i = 0; i < pages.size(); i++) {
+						
+						String[][] page = reader.readCSV(curTable.getPath() + pages.get(i));
+						for (row = 1; (row < page.length) && page[row][clusterColIndex] != null; row++) {
 							// prepare the values to be compared
 							// compare the values to find index of insertion
-							Object curVal = constructor.newInstance(pageData[row][clusterColIndex]);
+							Object curVal = constructor.newInstance(page[row][clusterColIndex]);
 							if (((Comparable) clusterVal).compareTo(curVal) < 0) {
 								rowReq = row;
 								pageReq = i;
@@ -231,38 +226,86 @@ public class DBApp {
 					}
 					if (rowReq == -1) {
 						rowReq = row;
-						pageReq = curTable.getPages().size() - 1;
+						pageReq = pages.size() - 1;
 					}
-					// shift tuples if required
-					String[][] page = reader.readNSizeTable(curTable.getPages().get(pageReq).getPath());
-					if (rowReq >= maxTableSize + 1) {
-						filePath = curTable.getPath() + "Page" + (curTable.getPages().size() + 1) + ".csv";
-						createPage(curTable, filePath);
-						writer.appendToFile(filePath, tuple);
-					} else if (page[rowReq][0] != null) {
+					String[][] page = reader.readNSizeTable(curTable.getPath() + File.separator + pages.get(pageReq));
+					String filePath = curTable.getPath() + File.separator + pages.get(pageReq) + ".csv";
+					if (page[rowReq][0] != null) {
 						page = shiftTuples(curTable, pageReq, rowReq);
 						page[row] = tuple.split(",");
-						filePath = curTable.getPages().get(pageReq).getPath();
 						writer.writePage(filePath, page);
 					} else {
 						page[rowReq] = tuple.split(",");
-						filePath = curTable.getPages().get(pageReq).getPath();
 						writer.writePage(filePath, page);
 					}
 				}
 			}
+			// No index is created on the table
+			// so insert according to clustering key
+			if (curTable.getPages().isEmpty() && allNull) {
+				// Table is currently empty
+				// create a new page and store the first tuple in it
+				String filePath = curTable.getPath() + "Page" + (curTable.getPages().size() + 1) + ".csv";
+				createPage(curTable, filePath);
+				writer.appendToFile(filePath, tuple);
+			} else if (allNull){
+				// Table already has Pages
+				// iterate over existing pages/tuples to find location of current tuple
+				// shift any other tuples that are below the current tuple
+				int rowReq = -1;
+				pageReq = -1;
+				int row = 1;
+				File firstPage = curTable.getPages().get(0);
+				String filePath = firstPage.getPath();
+				String[][] pageData = reader.readNSizeTable(filePath);
+				for (int i = 0; i < curTable.getPages().size(); i++) {
+					File curPage = curTable.getPages().get(i);
+					pageData = reader.readNSizeTable(curPage.getPath());
+					for (row = 1; (row < pageData.length) && pageData[row][clusterColIndex] != null; row++) {
+						// prepare the values to be compared
+						// compare the values to find index of insertion
+						Object curVal = constructor.newInstance(pageData[row][clusterColIndex]);
+						if (((Comparable) clusterVal).compareTo(curVal) < 0) {
+							rowReq = row;
+							pageReq = i;
+							break;
+						} else if (((Comparable) clusterVal).compareTo(curVal) == 0)
+							throw new DBAppException("Can not have duplicates of clustering key value: " + curVal.toString());
+					}
+				}
+				if (rowReq == -1) {
+					rowReq = row;
+					pageReq = curTable.getPages().size() - 1;
+				}
+				// shift tuples if required
+				String[][] page = reader.readNSizeTable(curTable.getPages().get(pageReq).getPath());
+				if (rowReq >= maxTableSize + 1) {
+					filePath = curTable.getPath() + "Page" + (curTable.getPages().size() + 1) + ".csv";
+					pageReq++;
+					createPage(curTable, filePath);
+					writer.appendToFile(filePath, tuple);
+				} else if (page[rowReq][0] != null) {
+					page = shiftTuples(curTable, pageReq, rowReq);
+					page[row] = tuple.split(",");
+					filePath = curTable.getPages().get(pageReq).getPath();
+					writer.writePage(filePath, page);
+				} else {
+					page[rowReq] = tuple.split(",");
+					filePath = curTable.getPages().get(pageReq).getPath();
+					writer.writePage(filePath, page);
+				}
+			}
+
 			// insert pages into grid index
 			for (int i = 0; i < curTable.getIndecies().size(); i++) {
-				System.out.println("entered");
 				GridIndex cur = curTable.getIndecies().get(i);
-				cur.insert(tuple.split(","), header, "Page" + pageReq);
+				cur.insert(tuple.split(","), header, "Page" + (pageReq + 1));
 			}
 		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
 				| ClassNotFoundException | NoSuchMethodException | SecurityException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
 	}
 
 	// shift tuples in the table for insertion method
@@ -335,18 +378,22 @@ public class DBApp {
 			throws DBAppException {
 		if (!tables.containsKey(strTableName))
 			throw new DBAppException(strTableName + " Table does not exist");
-		String[] res = new String[4];
+		String[] res = new String[6];
 		StringBuilder sb = new StringBuilder();
 		String[][] metaData;
 		try {
 			metaData = reader.readCSV("metadata.csv");
 			String[][] tableMeta = reader.readTableMeta(metaData, strTableName);
+			String[] header = new String[tableMeta.length];
 			for (int i = 0; i < tableMeta.length; i++) {
 				if (tableMeta[i][3].equals("True")) {
 					res[1] = tableMeta[i][1];
 					res[2] = tableMeta[i][2];
+					res[5] = "" + i;
 				}
+				header[i] = tableMeta[i][1];
 			}
+			res[4] = convertToString(header);
 			for (int i = 0; i < tableMeta.length; i++) {
 				// getting column name and its value
 				String colName = tableMeta[i][1];
@@ -872,7 +919,8 @@ public class DBApp {
 
 	public static void serialize(GridIndex g) {
 		try {
-			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(System.getProperty("user.dir") + File.separator+ "_Indecies" + File.separator + g.getName() + ".ser"));
+			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(System.getProperty("user.dir")
+					+ File.separator + "_Indecies" + File.separator + g.getName() + ".ser"));
 			out.writeObject(g);
 			out.close();
 		} catch (IOException e) {

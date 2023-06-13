@@ -1,7 +1,10 @@
+import java.io.FileReader;
+import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Properties;
 
 public class GridIndex implements Serializable {
 	private String name;
@@ -25,8 +28,16 @@ public class GridIndex implements Serializable {
 		this.col1Type = colType1;
 		this.col2Type = colType2;
 		
-		int N = 10; // store grid size in config file
-		this.grid = new String[N + 1][N + 1];
+		Properties properties = new Properties();
+		try (FileReader reader = new FileReader("DBApp.config")) {
+			properties.load(reader);
+			String value1 = properties.getProperty("GridSize");
+			gridSize = Integer.parseInt(value1);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		this.grid = new String[gridSize + 1][gridSize + 1];
 		this.grid[0][0] = "     ";
 		if (canParseInt(min1) && canParseInt(min2) && canParseInt(max1) && canParseInt(max2)) {
 			int min1Int = Integer.parseInt(min1);
@@ -34,8 +45,8 @@ public class GridIndex implements Serializable {
 			int min2Int = Integer.parseInt(min2);
 			int max2Int = Integer.parseInt(max2);
 
-			int groupSize1 = (max1Int - min1Int) / N;
-			int groupSize2 = (max2Int - min2Int) / N;
+			int groupSize1 = (max1Int - min1Int) / gridSize;
+			int groupSize2 = (max2Int - min2Int) / gridSize;
 
 			int j = min1Int;
 			for (int i = 1; i < this.grid.length; i++) {
@@ -72,7 +83,7 @@ public class GridIndex implements Serializable {
 
 			// fill headers
 			int groupSize1 = 0;
-			int groupSize2 = (((Comparable) max2Obj).compareTo(min2Obj) + 1) / (N);
+			int groupSize2 = (((Comparable) max2Obj).compareTo(min2Obj) + 1) / (gridSize);
 
 			System.out.println(((Comparable) max1Obj).compareTo(min1Obj));
 			System.out.println(groupSize1);
@@ -80,7 +91,7 @@ public class GridIndex implements Serializable {
 
 			Object j = min1Obj;
 			int i = 1;
-			for (j = min1Obj; i <= N && ((Comparable) j).compareTo(max1Obj) < 0; incrementObject(j, 1)) {
+			for (j = min1Obj; i <= gridSize && ((Comparable) j).compareTo(max1Obj) < 0; incrementObject(j, 1)) {
 				String group = j.toString();
 				incrementObject(j, groupSize1);
 				if (((Comparable) j).compareTo(max1Obj) > 0)
@@ -89,7 +100,7 @@ public class GridIndex implements Serializable {
 				this.grid[0][i++] = group;
 			}
 			i = 1;
-			for (j = min2Obj; i <= N && ((Comparable) j).compareTo(max2Obj) < 0; incrementObject(j, 1)) {
+			for (j = min2Obj; i <= gridSize && ((Comparable) j).compareTo(max2Obj) < 0; incrementObject(j, 1)) {
 				String group = j.toString();
 				incrementObject(j, groupSize2);
 				if (((Comparable) j).compareTo(max2Obj) > 0)
@@ -298,8 +309,6 @@ public class GridIndex implements Serializable {
 			minMaxPair = grid[i][0].split("-");
 			column2.add(minMaxPair);
 		}
-
-		System.out.println(this.col2);
 		Class colClass1 = Class.forName(this.col1Type);
 		Class colClass2 = Class.forName(col2Type);
 		Constructor constructor1 = colClass1.getConstructor(String.class);
@@ -332,11 +341,129 @@ public class GridIndex implements Serializable {
 			}
 			index++;
 		}
-
+		
+		pageReq += ".csv";
 		if (grid[indexInGrid[1]][indexInGrid[0]] == null)
 			grid[indexInGrid[1]][indexInGrid[0]] = pageReq;
 		else if (!grid[indexInGrid[1]][indexInGrid[0]].contains(pageReq))
 			grid[indexInGrid[1]][indexInGrid[0]] += "-" + pageReq;
+		System.out.println(grid[indexInGrid[1]][indexInGrid[0]]);
 		saveIndex();
+	}
+	
+	public void remove(int i, int j, String pageName) {
+		String cell = grid[i][j];
+		if (cell == null)
+			return;
+		String[] pages = cell.split("-");
+		StringBuilder sb = new StringBuilder();
+		for (int k = 0; k < pages.length; k++) {
+			if (!pages[k].equals(pageName))
+			{
+				sb.append(pageName);
+				sb.append("-");
+			}
+		}
+		grid[i][j] = sb.toString();
+		if (sb.isEmpty())
+			grid[i][j] = null;
+		saveIndex();
+	}
+	
+	
+	public boolean contains() {
+		return false;
+	}
+	
+	public String get(String val1, String val2) throws ClassNotFoundException, NoSuchMethodException, SecurityException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+		ArrayList<String[]> column1 = new ArrayList<>();
+		ArrayList<String[]> column2 = new ArrayList<>();
+		for (int i = 1; i < this.grid.length; i++) {
+			String[] minMaxPair = grid[0][i].split("-");
+			column1.add(minMaxPair);
+			minMaxPair = grid[i][0].split("-");
+			column2.add(minMaxPair);
+		}
+		Class colClass1 = Class.forName(this.col1Type);
+		Class colClass2 = Class.forName(col2Type);
+		Constructor constructor1 = colClass1.getConstructor(String.class);
+		Constructor constructor2 = colClass2.getConstructor(String.class);
+		
+		Object col1Val = constructor1.newInstance(val1);
+		Object col2Val = constructor2.newInstance(val2);
+		int[] indexInGrid = new int[2];
+		int index = 0;
+		while (index < column1.size()) {
+			Object max1Val = constructor1.newInstance(column1.get(index)[1]);
+			Object max2Val = constructor2.newInstance(column2.get(index)[1]);
+			Object min1Val = constructor1.newInstance(column1.get(index)[0]);
+			Object min2Val = constructor2.newInstance(column2.get(index)[0]);
+			if (((Comparable) max1Val).compareTo(col1Val) >= 0
+					&& ((Comparable) min1Val).compareTo(col1Val) <= 0) {
+				indexInGrid[0] = index + 1;
+			}
+			if (((Comparable) max2Val).compareTo(col2Val) >= 0
+					&& ((Comparable) min2Val).compareTo(col2Val) <= 0) {
+				indexInGrid[1] = index + 1;
+			}
+			index++;
+		}
+		return grid[indexInGrid[1]][indexInGrid[0]];
+	}
+	
+	public String[] getByCluster(String val, boolean first) throws ClassNotFoundException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
+		String[] res = new String[gridSize];
+		if (first) {
+			ArrayList<String[]> column1 = new ArrayList<>();
+			for (int i = 1; i < this.grid.length; i++) {
+				String[] minMaxPair = grid[0][i].split("-");
+				column1.add(minMaxPair);
+			}
+			Class colClass1 = Class.forName(this.col1Type);
+			Constructor constructor1 = colClass1.getConstructor(String.class);
+			
+			Object col1Val = constructor1.newInstance(val);
+			int indexInGrid = 0;
+			int index = 0;
+			while (index < column1.size()) {
+				Object max1Val = constructor1.newInstance(column1.get(index)[1]);
+				Object min1Val = constructor1.newInstance(column1.get(index)[0]);
+				if (((Comparable) max1Val).compareTo(col1Val) >= 0
+						&& ((Comparable) min1Val).compareTo(col1Val) <= 0) {
+					indexInGrid = index + 1;
+					break;
+				}
+				index++;
+			}
+			for (int i = 0; i < res.length; i++) {
+				res[i] = grid[i + 1][indexInGrid];
+			}
+		} else {
+			ArrayList<String[]> column2 = new ArrayList<>();
+			for (int i = 1; i < this.grid.length; i++) {
+				String[] minMaxPair = grid[i][0].split("-");
+				column2.add(minMaxPair);
+			}
+			Class colClass2 = Class.forName(col2Type);
+			Constructor constructor2 = colClass2.getConstructor(String.class);
+
+			Object col2Val = constructor2.newInstance(val);
+			int indexInGrid = 0;
+			int index = 0;
+			while (index < column2.size()) {
+				Object max2Val = constructor2.newInstance(column2.get(index)[1]);
+				Object min2Val = constructor2.newInstance(column2.get(index)[0]);
+				if (((Comparable) max2Val).compareTo(col2Val) >= 0
+						&& ((Comparable) min2Val).compareTo(col2Val) <= 0) {
+					indexInGrid = index + 1;
+					break;
+				}
+				index++;
+			}
+			for (int i = 0; i < res.length; i++) {
+				res[i] = grid[i + 1][indexInGrid];
+			}
+		}
+		return res;
 	}
 }

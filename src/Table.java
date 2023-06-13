@@ -25,12 +25,12 @@ public class Table implements Serializable {
 		if (!folder.exists()) {
 			boolean created = folder.mkdirs();
 			if (created) {
-				System.out.println("Folder created successfully.");
+				//System.out.println("Folder created successfully.");
 			} else {
-				System.out.println("Failed to create the folder.");
+				//System.out.println("Failed to create the folder.");
 			}
 		} else {
-			System.out.println("Folder already exists.");
+			//System.out.println("Folder already exists.");
 		}
 		this.path += "\\" + name + "\\";
 		this.hasIndex = false;

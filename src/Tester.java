@@ -99,6 +99,13 @@ public class Tester {
 			htblColNameVal.put("ProductName", new String("Power Bank"));
 			htblColNameVal.put("ProductPrice", new Double(50000));
 			db.insertIntoTable("Product", htblColNameVal);
+			htblColNameVal = new Hashtable<>();
+			htblColNameVal.put("ProductID", new Integer(801));
+			htblColNameVal.put("ProductName", new String("Power Bank"));
+			htblColNameVal.put("ProductPrice", new Double(50001));
+			db.insertIntoTable("Product", htblColNameVal);
+			
+			System.out.println("Terminated");
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
