@@ -80,9 +80,9 @@ public class Tester {
 				db.insertIntoTable("Sale", htblColNameVal);
 			}
 
-//			htblColNameVal = new Hashtable<>();
-//			htblColNameVal.put("ProductID", new Integer(1));
-//			db.deleteFromTable("Product",htblColNameVal);
+			htblColNameVal = new Hashtable<>();
+			htblColNameVal.put("ProductID", new Integer(1));
+			db.deleteFromTable("Product",htblColNameVal);
 //			SQLTerm[] arrsqlSqlTerms = new SQLTerm[2];
 //			arrsqlSqlTerms[0] = new SQLTerm("Sale", "TotalAmount", ">", new Double(250));
 //			arrsqlSqlTerms[1] = new SQLTerm("Sale", "Quantity", ">", new Integer(3));

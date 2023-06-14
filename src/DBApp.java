@@ -549,8 +549,6 @@ public class DBApp {
 	public static boolean checkForForeignKey(String table, String colName, String value) {
 		Table t = tables.get(table);
 //		if (t.hasIndex()) {
-//			return false;
-//		}
 		// if no index is created
 		// loop on all pages and compare the value with the tuples
 		for (int i = 0; i < t.getPages().size(); i++) {
@@ -682,10 +680,21 @@ public class DBApp {
 		if (!tables.containsKey(strTableName))
 			throw new DBAppException(strTableName + " Table does not exist");
 		try {
+			System.out.println("delete");
 			Table curTable = tables.get(strTableName);
-			if (curTable.hasIndex()) {
-				// if there is an index created on the table required
-			} else {
+			Hashtable<String, String> foreigns = new Hashtable<>();
+			String[][] metaData = reader.readCSV("metadata.csv");
+			for (int i = 0; i < metaData.length; i++) {
+				if (htblColNameValue.containsKey(metaData[i][1]) && metaData[i][8].equals("True") && !curTable.getName().equals(metaData[i][0])) {
+					foreigns.put(metaData[i][1], metaData[i][0]);
+					System.out.println(metaData[i][1]);
+					System.out.println(metaData[i][0]);
+				}
+			}
+//			if (curTable.hasIndex()) {
+//				// if there is an index created on the table required
+//			} 
+//			else {
 				// if no index is created on the table
 				// search linearly through the entire table to find the required tuple/tuples
 				for (int i = 0; i < curTable.getPages().size(); i++) {
@@ -708,24 +717,56 @@ public class DBApp {
 								Constructor constructor = colClass.getConstructor(String.class);
 								Object val = constructor.newInstance(page[j][k]);
 								if (htblColNameValue.get(header[k]).equals(val))
-									shiftupTuples(curTable, i, j);
+								{
+									String[] tuple = shiftupTuples(curTable, i, j);
+									deleteForeign(foreigns, header, tuple);
+								}
 							}
 						}
 					}
 				}
-			}
+	//		}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 	}
 
+	public static void deleteForeign(Hashtable<String, String> foreigns, String[] header, String[] tuple) {
+		for (int i = 0; i < header.length; i++) {
+			if (foreigns.containsKey(header[i])) {
+				Table cur = tables.get(foreigns.get(header[i]));
+				for (int j = 0; j < cur.getPages().size(); j++) {
+					String[][] page = reader.readCSV(cur.getPages().get(i).getPath());
+					String[] pageHeader = page[0];
+					int pageInd = 0;
+					for (int k = 0; k < pageHeader.length; k++) {
+						if (pageHeader[k].equals(header[i]))
+							pageInd = k;
+					}
+					boolean found = false;
+					for (int k = 1; k < page.length; k++) {
+						if (page[k][pageInd].equals(tuple[i])) {
+							page[k][pageInd] = null;
+							writer.writePage(cur.getPages().get(i).getPath(), page);
+							found = true;
+							break;
+						}
+					}
+					if (found)
+						break;
+				}
+			}
+		}
+	}
+	
 	// shift tuples in the table for deletion method
-	public static String[][] shiftupTuples(Table table, int pageNum, int index) {// <------------------doesnt make the
+	public static String[] shiftupTuples(Table table, int pageNum, int index) {// <------------------doesnt make the
 																					// last attribute
 		// empty
 		int Req_row = index;
 		String[][] page = reader.readCSV(table.getPages().get(pageNum).getPath());
+		String[] tuple = page[index];
 		if (page.length > 2) {
 			// first reserved for the labels and the second for the first and only attribute
 			// which will be deleted
@@ -745,7 +786,7 @@ public class DBApp {
 			}
 		}
 
-		return null;
+		return tuple;
 	}// <--------------------------------------------------------------------------------------------------------------------------------------------------------->
 
 	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
