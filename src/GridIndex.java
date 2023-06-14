@@ -4,7 +4,9 @@ import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Properties;
+import java.util.*;
 
 public class GridIndex implements Serializable {
 	private String name;
@@ -347,7 +349,6 @@ public class GridIndex implements Serializable {
 			grid[indexInGrid[1]][indexInGrid[0]] = pageReq;
 		else if (!grid[indexInGrid[1]][indexInGrid[0]].contains(pageReq))
 			grid[indexInGrid[1]][indexInGrid[0]] += "-" + pageReq;
-		System.out.println(grid[indexInGrid[1]][indexInGrid[0]]);
 		saveIndex();
 	}
 	
@@ -464,6 +465,7 @@ public class GridIndex implements Serializable {
 				res[i] = grid[i + 1][indexInGrid];
 			}
 		}
+		Arrays.sort(res, Comparator.nullsLast(Comparator.naturalOrder()));
 		return res;
 	}
 }

@@ -195,7 +195,7 @@ public class DBApp {
 					String[] indexName = gridIndex.getName().split("_");
 					String col1 = indexName[0];
 					String col2 = indexName[1];
-					
+
 					String[] pageNames = gridIndex.getByCluster(clusteringVal, col1.equals(clusteringCol));
 					ArrayList<String> pages = new ArrayList<>();
 					for (int i = 0; i < pageNames.length; i++) {
@@ -207,12 +207,13 @@ public class DBApp {
 							pages.add(s);
 						allNull = false;
 					}
-					if (allNull)
+					if (allNull) {
 						break indexLabel;
+					}
 					int row = -1, rowReq = -1;
 					int pageInPages = -1;
 					for (int i = 0; i < pages.size(); i++) {
-						
+
 						String[][] page = reader.readCSV(curTable.getPath() + pages.get(i));
 						for (row = 1; (row < page.length) && page[row][clusterColIndex] != null; row++) {
 							// prepare the values to be compared
@@ -225,7 +226,8 @@ public class DBApp {
 								pageReq = Integer.parseInt(pageNum) - 1;
 								break;
 							} else if (((Comparable) clusterVal).compareTo(curVal) == 0)
-								throw new DBAppException("Can not have duplicates of clustering key value");
+								throw new DBAppException(
+										"Can not have duplicates of clustering key value: " + clusterVal);
 						}
 					}
 					if (rowReq == -1) {
@@ -234,9 +236,36 @@ public class DBApp {
 						pageInPages = pages.size() - 1;
 						pageReq = Integer.parseInt(pageNum) - 1;
 					}
-					String[][] page = reader.readNSizeTable(curTable.getPath() + File.separator + pages.get(pageInPages));
-					String filePath = curTable.getPath() + File.separator + pages.get(pageInPages) + ".csv";
-					if (page[rowReq][0] != null) {
+					String[][] page = reader
+							.readNSizeTable(curTable.getPath() + File.separator + pages.get(pageInPages));
+					String filePath = curTable.getPath() + File.separator + pages.get(pageInPages);
+//					System.out.println(pageReq);
+//					System.out.println(rowReq);
+					if (rowReq > maxTableSize) {
+						if (curTable.getPages().get(curTable.getPages().size() - 1).getName().equals(pages.get(pageInPages)))
+						{
+							// it is the last page in the table
+							// create a new page and insert the tuple
+							filePath = curTable.getPath() + File.separator + "Page" + (curTable.getPages().size() + 1) + ".csv";
+							pageReq++;
+							createPage(curTable, filePath);							
+							writer.appendToFile(filePath, tuple);
+						} else {
+							// add it to the next page then shift all tuples
+							int t = 0;
+							// find next page
+							for (; t < curTable.getPages().size(); t++) {
+								if (curTable.getPages().get(t).getName().equals(pages.get(pageInPages))) {
+									t++;
+									break;
+								}
+							}
+							int pageNum = Integer.parseInt(pages.get(pageInPages).substring(4).replaceAll(Pattern.quote(".csv"), "")) + 1;
+							page = shiftTuples(curTable, pageNum, rowReq);
+							page[row] = tuple.split(",");
+							writer.writePage(filePath, page);
+						}
+					} else if (page[rowReq][0] != null) {
 						page = shiftTuples(curTable, pageReq, rowReq);
 						page[row] = tuple.split(",");
 						writer.writePage(filePath, page);
@@ -251,10 +280,11 @@ public class DBApp {
 			if (curTable.getPages().isEmpty() && allNull) {
 				// Table is currently empty
 				// create a new page and store the first tuple in it
+				pageReq = 0;
 				String filePath = curTable.getPath() + "Page" + (curTable.getPages().size() + 1) + ".csv";
 				createPage(curTable, filePath);
 				writer.appendToFile(filePath, tuple);
-			} else if (allNull){
+			} else if (allNull) {
 				// Table already has Pages
 				// iterate over existing pages/tuples to find location of current tuple
 				// shift any other tuples that are below the current tuple
@@ -276,7 +306,8 @@ public class DBApp {
 							pageReq = i;
 							break;
 						} else if (((Comparable) clusterVal).compareTo(curVal) == 0)
-							throw new DBAppException("Can not have duplicates of clustering key value: " + curVal.toString());
+							throw new DBAppException(
+									"Can not have duplicates of clustering key value: " + curVal.toString());
 					}
 				}
 				if (rowReq == -1) {
@@ -301,7 +332,6 @@ public class DBApp {
 					writer.writePage(filePath, page);
 				}
 			}
-
 			// insert pages into grid index
 			for (int i = 0; i < curTable.getIndecies().size(); i++) {
 				GridIndex cur = curTable.getIndecies().get(i);
@@ -328,7 +358,6 @@ public class DBApp {
 					// if at the beginning of a file and need to read from previous file
 					String[][] prevPage = reader.readNSizeTable(table.getPages().get(i - 1).getPath());
 					String filePath = table.getPath() + "Page" + (table.getPages().size() + 1) + ".csv";
-
 					pageContent[1] = prevPage[maxTableSize];
 					writer.writePage(filePath, pageContent);
 				} else if (j == maxTableSize && i == table.getPages().size() - 1) {
@@ -424,8 +453,7 @@ public class DBApp {
 					String foreignTable = tableMeta[i][9];
 					String foreignCol = tableMeta[i][10];
 					if (!checkForForeignKey(foreignTable, foreignCol, value.toString()))
-						throw new DBAppException(
-								value.toString() + " Foreign Key does not exist in table" + foreignTable);
+						throw new DBAppException(value.toString() + " Foreign Key does not exist in table " + foreignTable);
 				}
 				Class colClass;
 				Constructor constructor;
@@ -520,9 +548,9 @@ public class DBApp {
 	// checks if value is present in column colName in the table
 	public static boolean checkForForeignKey(String table, String colName, String value) {
 		Table t = tables.get(table);
-		if (t.hasIndex()) {
-			return false;
-		}
+//		if (t.hasIndex()) {
+//			return false;
+//		}
 		// if no index is created
 		// loop on all pages and compare the value with the tuples
 		for (int i = 0; i < t.getPages().size(); i++) {

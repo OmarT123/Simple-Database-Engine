@@ -37,11 +37,13 @@ public class Tester {
 			db.createTable("Product", "ProductID", htblColNameType, htblColNameMin, htblColNameMax, htblForeignKeys,
 					computedCols);
 			Hashtable<String, Object> htblColNameVal = new Hashtable<>();
-			for (int i = 0; i <= 210; i++) {
+			String[] ind = { "ProductID", "ProductPrice" };
+			db.createIndex("Product", ind);
+			for (int i = 0; i <= 1000; i++) {
 				htblColNameVal = new Hashtable<>();
 				htblColNameVal.put("ProductID", new Integer(i));
 				htblColNameVal.put("ProductName", new String("Power Bank"));
-				htblColNameVal.put("ProductPrice", new Double(15.5));
+				htblColNameVal.put("ProductPrice", new Double(9999 + i));
 				db.insertIntoTable("Product", htblColNameVal);
 			}
 
@@ -90,21 +92,6 @@ public class Tester {
 //			while (resultSet.hasNext()) {
 //				System.out.println(db.convertToString((String[]) resultSet.next()));
 //			}
-
-			String[] ind = { "ProductID", "ProductPrice" };
-			db.createIndex("Product", ind);
-
-			htblColNameVal = new Hashtable<>();
-			htblColNameVal.put("ProductID", new Integer(800));
-			htblColNameVal.put("ProductName", new String("Power Bank"));
-			htblColNameVal.put("ProductPrice", new Double(50000));
-			db.insertIntoTable("Product", htblColNameVal);
-			htblColNameVal = new Hashtable<>();
-			htblColNameVal.put("ProductID", new Integer(801));
-			htblColNameVal.put("ProductName", new String("Power Bank"));
-			htblColNameVal.put("ProductPrice", new Double(51001));
-			db.insertIntoTable("Product", htblColNameVal);
-			
 			System.out.println("Terminated");
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
