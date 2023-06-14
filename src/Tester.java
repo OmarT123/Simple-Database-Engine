@@ -102,7 +102,7 @@ public class Tester {
 			htblColNameVal = new Hashtable<>();
 			htblColNameVal.put("ProductID", new Integer(801));
 			htblColNameVal.put("ProductName", new String("Power Bank"));
-			htblColNameVal.put("ProductPrice", new Double(50001));
+			htblColNameVal.put("ProductPrice", new Double(51001));
 			db.insertIntoTable("Product", htblColNameVal);
 			
 			System.out.println("Terminated");

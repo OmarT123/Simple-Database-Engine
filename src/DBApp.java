@@ -12,6 +12,7 @@ import java.text.SimpleDateFormat;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -209,6 +210,7 @@ public class DBApp {
 					if (allNull)
 						break indexLabel;
 					int row = -1, rowReq = -1;
+					int pageInPages = -1;
 					for (int i = 0; i < pages.size(); i++) {
 						
 						String[][] page = reader.readCSV(curTable.getPath() + pages.get(i));
@@ -217,19 +219,23 @@ public class DBApp {
 							// compare the values to find index of insertion
 							Object curVal = constructor.newInstance(page[row][clusterColIndex]);
 							if (((Comparable) clusterVal).compareTo(curVal) < 0) {
+								String pageNum = pages.get(i).substring(4).replaceAll(Pattern.quote(".csv"), "");
 								rowReq = row;
-								pageReq = i;
+								pageInPages = i;
+								pageReq = Integer.parseInt(pageNum) - 1;
 								break;
 							} else if (((Comparable) clusterVal).compareTo(curVal) == 0)
 								throw new DBAppException("Can not have duplicates of clustering key value");
 						}
 					}
 					if (rowReq == -1) {
+						String pageNum = pages.get(pages.size() - 1).substring(4).replaceAll(Pattern.quote(".csv"), "");
 						rowReq = row;
-						pageReq = pages.size() - 1;
+						pageInPages = pages.size() - 1;
+						pageReq = Integer.parseInt(pageNum) - 1;
 					}
-					String[][] page = reader.readNSizeTable(curTable.getPath() + File.separator + pages.get(pageReq));
-					String filePath = curTable.getPath() + File.separator + pages.get(pageReq) + ".csv";
+					String[][] page = reader.readNSizeTable(curTable.getPath() + File.separator + pages.get(pageInPages));
+					String filePath = curTable.getPath() + File.separator + pages.get(pageInPages) + ".csv";
 					if (page[rowReq][0] != null) {
 						page = shiftTuples(curTable, pageReq, rowReq);
 						page[row] = tuple.split(",");
