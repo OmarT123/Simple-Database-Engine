@@ -80,18 +80,18 @@ public class Tester {
 				db.insertIntoTable("Sale", htblColNameVal);
 			}
 
-			htblColNameVal = new Hashtable<>();
-			htblColNameVal.put("ProductPrice", new Integer(7777));
-			db.updateTable("Product", "1", htblColNameVal);
-//			SQLTerm[] arrsqlSqlTerms = new SQLTerm[2];
-//			arrsqlSqlTerms[0] = new SQLTerm("Sale", "TotalAmount", ">", new Double(250));
-//			arrsqlSqlTerms[1] = new SQLTerm("Sale", "Quantity", ">", new Integer(3));
-//			String[] operators = new String[1];
-//			operators[0] = "AND";
-//			Iterator resultSet = db.selectFromTable(arrsqlSqlTerms, operators);
-//			while (resultSet.hasNext()) {
-//				System.out.println(db.convertToString((String[]) resultSet.next()));
-//			}
+//			htblColNameVal = new Hashtable<>();
+//			htblColNameVal.put("ProductPrice", new Integer(7777));
+//			db.updateTable("Product", "1", htblColNameVal);
+			SQLTerm[] arrsqlSqlTerms = new SQLTerm[2];
+			arrsqlSqlTerms[0] = new SQLTerm("Product", "ProductID", ">", new Integer(200));
+			arrsqlSqlTerms[1] = new SQLTerm("Product", "ProductPrice", ">", new Double(10500));
+			String[] operators = new String[1];
+			operators[0] = "AND";
+			Iterator resultSet = db.selectFromTable(arrsqlSqlTerms, operators);
+			while (resultSet.hasNext()) {
+				System.out.println(db.convertToString((String[]) resultSet.next()));
+			}
 			System.out.println("Terminated");
 		} catch (Exception e) {
 			// TODO Auto-generated catch block

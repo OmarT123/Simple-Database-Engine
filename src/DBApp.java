@@ -595,7 +595,6 @@ public class DBApp {
 			}
 			// if there is an index created on the table required
 			if (exist == true) {
-				System.out.println("here2");
 				GridIndex cur = curTable.getIndecies().get(gridindex);
 				String[] pages;
 				ArrayList<String> afterSplit = new ArrayList<>();
@@ -611,12 +610,10 @@ public class DBApp {
 					String[] temp = pages[i].split("-");
 					for (String s : temp)
 						afterSplit.add(s);
-					System.out.println(afterSplit);
 
 				}
 				HashSet<String> uniqueSet = new HashSet<>(afterSplit);
 				afterSplit = new ArrayList<>(uniqueSet);
-				System.out.println(afterSplit.size());
 				for (int i = 0; i < afterSplit.size(); i++) {
 					String[][] curpage = reader.readCSV(curTable.getPath() + afterSplit.get(i));
 					String[][] headerAndTuple = findTupleUsingIndex(curTable, afterSplit, strClusteringKeyValue);
@@ -962,44 +959,94 @@ public class DBApp {
 		Table t = tables.get(arrSQLTerms[0].get_strTableName());
 		if (t.getPages().size() == 0)
 			return null;
-		if (t.hasIndex()) {
+		try {
+			int[] gridindecies = new int[arrSQLTerms.length * 2];
+			for (int j = 0; j < arrSQLTerms.length; j++) {
+				for (int k = 0; k < t.getIndecies().size(); k++) {
+					String[] column = t.getIndecies().get(k).getName().split("_");
+					if (column[0].equals(arrSQLTerms[j].get_strColumnName())) {
+						gridindecies[j * 2] = k;
+						gridindecies[j * 2 + 1] = 0;
+					} else if (column[1].equals(arrSQLTerms[j].get_strColumnName())) {
+						gridindecies[j * 2] = k;
+						gridindecies[j * 2 + 1] = 1;
+					} else
+						gridindecies[j] = -1;
+				}
+			}
+			LinkedList<LinkedList<String[]>> SQLres = new LinkedList<>();
+			String[] supportedOperators = { ">", ">=", "<", "<=", "=" };
 
-		} else {
-			// if no index is created on the table
-			try {
-				LinkedList<LinkedList<String[]>> SQLres = new LinkedList<>();
-				String[] supportedOperators = { ">", ">=", "<", "<=", "=" };
+			// read the metadata associated with the table
+			String tableName = t.getName();
+			String[][] metadata = reader.readCSV("metadata.csv");
+			String[][] tableMeta = reader.readTableMeta(metadata, tableName);
+			String[] header = new String[tableMeta.length];
+			for (int i = 0; i < tableMeta.length; i++) {
+				header[i] = tableMeta[i][1];
+			}
+			for (int i = 0; i < arrSQLTerms.length; i++) {
+				// read sql term and validate its object type store it in the arrayList
+				SQLTerm cur = arrSQLTerms[i];
+				String colName = cur.get_strColumnName();
+				String operator = cur.get_strOperator();
+				Object value = cur.get_objValue();
+				// read metadata to find out the data type of the column
+				// validate that the value is of that type
+				// check if operator is one of the supported operators
+				if (!listContains(operator, supportedOperators))
+					throw new DBAppException(operator + " is not a supported operator");
+				String type = "";
+				Class colClass = null;
+				for (int j = 0; j < tableMeta.length; j++) {
+					if (tableMeta[j][1].equals(colName)) {
 
-				// read the metadata associated with the table
-				String tableName = t.getName();
-				String[][] metadata = reader.readCSV("metadata.csv");
-				String[][] tableMeta = reader.readTableMeta(metadata, tableName);
-				String[] header = null;
-				for (int i = 0; i < arrSQLTerms.length; i++) {
-					// read sql term and validate its object type store it in the arrayList
-					SQLTerm cur = arrSQLTerms[i];
-					String colName = cur.get_strColumnName();
-					String operator = cur.get_strOperator();
-					Object value = cur.get_objValue();
-					// read metadata to find out the data type of the column
-					// validate that the value is of that type
-					// check if operator is one of the supported operators
-					if (!listContains(operator, supportedOperators))
-						throw new DBAppException(operator + " is not a supported operator");
-					String type = "";
-					Class colClass = null;
-					for (int j = 0; j < tableMeta.length; j++) {
-						if (tableMeta[j][1].equals(colName)) {
+						// handle the date case
 
-							// handle the date case
-
-							type = tableMeta[j][2];
-							colClass = Class.forName(type);
-							if (!colClass.equals(value.getClass()))
-								throw new DBAppException("Incompatible data types");
-							break;
+						type = tableMeta[j][2];
+						colClass = Class.forName(type);
+						if (!colClass.equals(value.getClass()))
+							throw new DBAppException("Incompatible data types");
+						break;
+					}
+				}
+				if (gridindecies[i * 2] != -1) {
+					GridIndex grid = t.getIndecies().get(gridindecies[i * 2]);
+					int curColumn = gridindecies[i * 2 + 1];
+					ArrayList<String> temp = grid.getByRange(arrSQLTerms[i].get_objValue().toString(), curColumn == 0,
+							arrSQLTerms[i].get_strOperator());
+					HashSet<String> hset = new HashSet<>();
+					for (String s : temp) {
+						if (s == null)
+							continue;
+						String[] t1 = s.split("-");
+						for (String ss : t1)
+							hset.add(ss);
+					}
+					ArrayList<String> pages = new ArrayList<>(hset);
+					Collections.sort(pages);
+					System.out.println("***");
+					System.out.println(pages);
+					System.out.println("***");
+					LinkedList<String[]> res = new LinkedList<>();
+					for (int j = 0; j < pages.size(); j++) {
+						String[][] page = reader.readCSV(t.getPath() + pages.get(j));
+						header = page[0];
+						int index = 0;
+						for (index = 0; index < header.length; index++) {
+							if (header[index].equals(colName))
+								break;
+						}
+						for (int row = 1; row < page.length; row++) {
+							String[] tuple = page[row];
+							if (checkCondition(tuple[index], operator, value, type))
+								res.add(tuple);
 						}
 					}
+					SQLres.add(res);
+				} else {
+					// if no index is created on the table
+					LinkedList<String[]> res = new LinkedList<>();
 					for (int j = 0; j < t.getPages().size(); j++) {
 						String[][] page = reader.readCSV(t.getPages().get(j).getPath());
 						header = page[0];
@@ -1008,72 +1055,72 @@ public class DBApp {
 							if (header[index].equals(colName))
 								break;
 						}
-						LinkedList<String[]> res = new LinkedList<>();
 						for (int row = 1; row < page.length; row++) {
 							String[] tuple = page[row];
 							if (checkCondition(tuple[index], operator, value, type))
 								res.add(tuple);
 						}
-						SQLres.add(res);
 					}
-					int opIndex = 0;
-					String clusterCol = t.getClusterCol();
-					int clusterIndex = 0;
-					for (int w = 0; w < header.length; w++) {
-						if (header[w].equals(clusterCol))
-							clusterIndex = w;
-					}
-					while (SQLres.size() > 1) {
-						LinkedList<String[]> first = SQLres.removeFirst();
-						LinkedList<String[]> second = SQLres.removeFirst();
-						LinkedList<String[]> result = new LinkedList<>();
-						String sqlOperator = strarrOperators[opIndex++];
-						Constructor constructor = colClass.getConstructor(String.class);
-						if (sqlOperator.equals("AND")) {
-							int a = 0;
-							int b = 0;
-							while (a < first.size() && b < second.size()) {
-								Object f = constructor.newInstance(first.get(a)[clusterIndex]);
-								Object s = constructor.newInstance(second.get(b)[clusterIndex]);
-								if (((Comparable) f).compareTo(s) < 0) {
-									a++;
-								} else if (((Comparable) f).compareTo(s) > 0) {
-									b++;
-								} else {
-									result.add(first.get(a));
-									a++;
-									b++;
-								}
-							}
-						} else {
-							int a = 0;
-							int b = 0;
-							while (a < first.size() && b < second.size()) {
-								Object f = constructor.newInstance(first.get(a)[clusterIndex]);
-								Object s = constructor.newInstance(second.get(b)[clusterIndex]);
-								if (((Comparable) f).compareTo(s) < 0) {
-									result.add(first.get(a));
-									a++;
-								} else if (((Comparable) f).compareTo(s) > 0) {
-									result.add(second.get(b));
-									b++;
-								} else {
-									result.add(first.get(a));
-									a++;
-									b++;
-								}
+					SQLres.add(res);
+				}
+				int opIndex = 0;
+				String clusterCol = t.getClusterCol();
+				int clusterIndex = 0;
+				for (int w = 0; w < header.length; w++) {
+					if (header[w].equals(clusterCol))
+						clusterIndex = w;
+				}
+				while (SQLres.size() > 1) {
+					LinkedList<String[]> first = SQLres.removeFirst();
+					LinkedList<String[]> second = SQLres.removeFirst();
+					LinkedList<String[]> result = new LinkedList<>();
+					String sqlOperator = strarrOperators[opIndex++];
+					Constructor constructor = colClass.getConstructor(String.class);
+					if (sqlOperator.equals("AND")) {
+						int a = 0;
+						int b = 0;
+						while (a < first.size() && b < second.size()) {
+							Object f = constructor.newInstance(first.get(a)[clusterIndex]);
+							Object s = constructor.newInstance(second.get(b)[clusterIndex]);
+							if (((Comparable) f).compareTo(s) < 0) {
+								a++;
+							} else if (((Comparable) f).compareTo(s) > 0) {
+								b++;
+							} else {
+								result.add(first.get(a));
+								a++;
+								b++;
 							}
 						}
-						SQLres.addFirst(result);
+					} else {
+						int a = 0;
+						int b = 0;
+						while (a < first.size() && b < second.size()) {
+							Object f = constructor.newInstance(first.get(a)[clusterIndex]);
+							Object s = constructor.newInstance(second.get(b)[clusterIndex]);
+							if (((Comparable) f).compareTo(s) < 0) {
+								result.add(first.get(a));
+								a++;
+							} else if (((Comparable) f).compareTo(s) > 0) {
+								result.add(second.get(b));
+								b++;
+							} else {
+								result.add(first.get(a));
+								a++;
+								b++;
+							}
+						}
 					}
+					SQLres.addFirst(result);
 				}
-				SQLres.getFirst().addFirst(header);
-				return SQLres.getFirst().iterator();
-			} catch (ClassNotFoundException | SecurityException | NoSuchMethodException | InstantiationException
-					| IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			}
+			SQLres.getFirst().addFirst(header);
+			return SQLres.getFirst().iterator();
+
+		} catch (ClassNotFoundException | SecurityException | NoSuchMethodException | InstantiationException
+				| IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		return null;
 	}
