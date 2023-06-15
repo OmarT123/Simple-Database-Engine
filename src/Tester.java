@@ -66,7 +66,7 @@ public class Tester {
 			htblColNameMax.put("Quantity", "10000");
 			htblColNameMax.put("TotalAmount", "1000000000");
 			htblForeignKeys.put("ProductID", "Product.ProductID");
-			String[] computed = new String[1];
+			String[] computed = {"TotalAmount"};
 			db.createTable("Sale", "SaleID", htblColNameType, htblColNameMin, htblColNameMax, htblForeignKeys,
 					computed);
 

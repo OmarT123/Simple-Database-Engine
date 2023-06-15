@@ -242,13 +242,14 @@ public class DBApp {
 //					System.out.println(pageReq);
 //					System.out.println(rowReq);
 					if (rowReq > maxTableSize) {
-						if (curTable.getPages().get(curTable.getPages().size() - 1).getName().equals(pages.get(pageInPages)))
-						{
+						if (curTable.getPages().get(curTable.getPages().size() - 1).getName()
+								.equals(pages.get(pageInPages))) {
 							// it is the last page in the table
 							// create a new page and insert the tuple
-							filePath = curTable.getPath() + File.separator + "Page" + (curTable.getPages().size() + 1) + ".csv";
+							filePath = curTable.getPath() + File.separator + "Page" + (curTable.getPages().size() + 1)
+									+ ".csv";
 							pageReq++;
-							createPage(curTable, filePath);							
+							createPage(curTable, filePath);
 							writer.appendToFile(filePath, tuple);
 						} else {
 							// add it to the next page then shift all tuples
@@ -260,7 +261,8 @@ public class DBApp {
 									break;
 								}
 							}
-							int pageNum = Integer.parseInt(pages.get(pageInPages).substring(4).replaceAll(Pattern.quote(".csv"), "")) + 1;
+							int pageNum = Integer.parseInt(
+									pages.get(pageInPages).substring(4).replaceAll(Pattern.quote(".csv"), "")) + 1;
 							page = shiftTuples(curTable, pageNum, rowReq);
 							page[row] = tuple.split(",");
 							writer.writePage(filePath, page);
@@ -453,7 +455,8 @@ public class DBApp {
 					String foreignTable = tableMeta[i][9];
 					String foreignCol = tableMeta[i][10];
 					if (!checkForForeignKey(foreignTable, foreignCol, value.toString()))
-						throw new DBAppException(value.toString() + " Foreign Key does not exist in table " + foreignTable);
+						throw new DBAppException(
+								value.toString() + " Foreign Key does not exist in table " + foreignTable);
 				}
 				Class colClass;
 				Constructor constructor;
@@ -680,21 +683,94 @@ public class DBApp {
 		if (!tables.containsKey(strTableName))
 			throw new DBAppException(strTableName + " Table does not exist");
 		try {
-			System.out.println("delete");
 			Table curTable = tables.get(strTableName);
 			Hashtable<String, String> foreigns = new Hashtable<>();
 			String[][] metaData = reader.readCSV("metadata.csv");
 			for (int i = 0; i < metaData.length; i++) {
-				if (htblColNameValue.containsKey(metaData[i][1]) && metaData[i][8].equals("True") && !curTable.getName().equals(metaData[i][0])) {
+				if (htblColNameValue.containsKey(metaData[i][1]) && metaData[i][8].equals("True")
+						&& !curTable.getName().equals(metaData[i][0])) {
 					foreigns.put(metaData[i][1], metaData[i][0]);
-					System.out.println(metaData[i][1]);
-					System.out.println(metaData[i][0]);
 				}
 			}
-//			if (curTable.hasIndex()) {
-//				// if there is an index created on the table required
-//			} 
-//			else {
+			boolean exist = false;
+			int gridindex = 0;
+			for (int i = 0; i < curTable.getIndecies().size(); i++) {
+				for (Map.Entry<String, Object> entry : htblColNameValue.entrySet()) {
+					String key = entry.getKey();
+					if (curTable.getIndecies().get(i).getName().contains(key)) {
+						exist = true;
+						gridindex = i;
+					}
+				}
+			}
+			if (exist == true) {
+				GridIndex cur = curTable.getIndecies().get(gridindex);
+				String[] colNames = cur.getName().split("_");
+				int numCols = 0;
+				boolean first = false;
+				String val1 = "";
+				String val2 = "";
+				for (Map.Entry<String, Object> entry : htblColNameValue.entrySet()) {
+					String key = entry.getKey();
+					if (key.equals(colNames[0])) {
+						numCols++;
+						first = true;
+						val1 = entry.getValue().toString();
+					} else if (key.equals(colNames[1])) {
+						numCols++;
+						val2 = entry.getValue().toString();
+					}
+				}
+				String[] pages;
+				ArrayList<String> afterSplit = new ArrayList<>();
+				String page = "";
+				if (numCols == 1) {
+					// get using cluster method and splitting
+					pages = cur.getByCluster(first ? val1 : val2, first);
+					for (int i = 0; i < pages.length; i++) {
+						if (pages[i] == null)
+							continue;
+						String[] temp = pages[i].split("-");
+						for (String s : temp)
+							afterSplit.add(s);
+					}
+				} else {
+					// numCols = 2
+					// get method using column names
+					page = cur.get(val1, val2);
+					String[] temp = page.split("-");
+					for (String s : temp)
+						afterSplit.add(s);
+				}
+				HashSet<String> uniqueSet = new HashSet<>(afterSplit);
+				afterSplit = new ArrayList<>(uniqueSet);
+				System.out.println(afterSplit);
+				for (int i = 0; i < afterSplit.size(); i++) {
+					String[][] curpage = reader.readCSV(curTable.getPath() + afterSplit.get(i));
+					String[] header = curpage[0];
+					int clusterColIndex = 0;
+					for (int h = 0; h < header.length; h++) {
+						if (curTable.getClusterCol().equals(header[h]))
+							clusterColIndex = h;
+					}
+					for (int j = 1; j < curpage.length; j++) {
+						// loop till i know which one is in the deletion list get the
+						// index from it
+						for (int k = 0; k < curpage[j].length; k++) {
+
+							// need to check for all input columns before deletion
+
+							if (htblColNameValue.containsKey(header[k])) {
+								Class colClass = htblColNameValue.get(header[k]).getClass();
+								Constructor constructor = colClass.getConstructor(String.class);
+								Object val = constructor.newInstance(curpage[j][k]);
+								if (htblColNameValue.get(header[k]).equals(val))
+									shiftupTuples(curTable, i, j);
+							}
+						}
+					}
+				}
+			} else {
 				// if no index is created on the table
 				// search linearly through the entire table to find the required tuple/tuples
 				for (int i = 0; i < curTable.getPages().size(); i++) {
@@ -716,8 +792,7 @@ public class DBApp {
 								Class colClass = htblColNameValue.get(header[k]).getClass();
 								Constructor constructor = colClass.getConstructor(String.class);
 								Object val = constructor.newInstance(page[j][k]);
-								if (htblColNameValue.get(header[k]).equals(val))
-								{
+								if (htblColNameValue.get(header[k]).equals(val)) {
 									String[] tuple = shiftupTuples(curTable, i, j);
 									deleteForeign(foreigns, header, tuple);
 								}
@@ -725,7 +800,8 @@ public class DBApp {
 						}
 					}
 				}
-	//		}
+				// }
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -759,10 +835,10 @@ public class DBApp {
 			}
 		}
 	}
-	
+
 	// shift tuples in the table for deletion method
 	public static String[] shiftupTuples(Table table, int pageNum, int index) {// <------------------doesnt make the
-																					// last attribute
+																				// last attribute
 		// empty
 		int Req_row = index;
 		String[][] page = reader.readCSV(table.getPages().get(pageNum).getPath());

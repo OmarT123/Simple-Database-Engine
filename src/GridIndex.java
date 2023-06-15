@@ -465,6 +465,7 @@ public class GridIndex implements Serializable {
 				res[i] = grid[i + 1][indexInGrid];
 			}
 		}
+		
 		Arrays.sort(res, Comparator.nullsLast(Comparator.naturalOrder()));
 		return res;
 	}
