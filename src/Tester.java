@@ -66,7 +66,7 @@ public class Tester {
 			htblColNameMax.put("Quantity", "10000");
 			htblColNameMax.put("TotalAmount", "1000000000");
 			htblForeignKeys.put("ProductID", "Product.ProductID");
-			String[] computed = {"TotalAmount"};
+			String[] computed = { "TotalAmount" };
 			db.createTable("Sale", "SaleID", htblColNameType, htblColNameMin, htblColNameMax, htblForeignKeys,
 					computed);
 
@@ -81,8 +81,8 @@ public class Tester {
 			}
 
 			htblColNameVal = new Hashtable<>();
-			htblColNameVal.put("ProductID", new Integer(1));
-			db.deleteFromTable("Product",htblColNameVal);
+			htblColNameVal.put("ProductPrice", new Integer(7777));
+			db.updateTable("Product", "1", htblColNameVal);
 //			SQLTerm[] arrsqlSqlTerms = new SQLTerm[2];
 //			arrsqlSqlTerms[0] = new SQLTerm("Sale", "TotalAmount", ">", new Double(250));
 //			arrsqlSqlTerms[1] = new SQLTerm("Sale", "Quantity", ">", new Integer(3));

@@ -581,8 +581,68 @@ public class DBApp {
 			throw new DBAppException(strTableName + " Table does not exist");
 		try {
 			Table curTable = tables.get(strTableName);
-			if (curTable.hasIndex()) {
-				// if there is an index created on the table required
+			boolean exist = false;
+			int gridindex = 0;
+			for (int i = 0; i < curTable.getIndecies().size(); i++) {
+				for (Map.Entry<String, Object> entry : htblColNameValue.entrySet()) {
+					String key = entry.getKey();
+					if (curTable.getIndecies().get(i).getName().contains(curTable.getClusterCol())) {
+						exist = true;
+						gridindex = i;
+					}
+
+				}
+			}
+			// if there is an index created on the table required
+			if (exist == true) {
+				System.out.println("here2");
+				GridIndex cur = curTable.getIndecies().get(gridindex);
+				String[] pages;
+				ArrayList<String> afterSplit = new ArrayList<>();
+				// get using cluster method and splitting
+				String[] colNames = cur.getName().split("_");
+				if (colNames[0].equals(strClusteringKeyValue))
+					pages = cur.getByCluster(strClusteringKeyValue, true);
+				else
+					pages = cur.getByCluster(strClusteringKeyValue, false);
+				for (int i = 0; i < pages.length; i++) {
+					if (pages[i] == null)
+						continue;
+					String[] temp = pages[i].split("-");
+					for (String s : temp)
+						afterSplit.add(s);
+					System.out.println(afterSplit);
+
+				}
+				HashSet<String> uniqueSet = new HashSet<>(afterSplit);
+				afterSplit = new ArrayList<>(uniqueSet);
+				System.out.println(afterSplit.size());
+				for (int i = 0; i < afterSplit.size(); i++) {
+					String[][] curpage = reader.readCSV(curTable.getPath() + afterSplit.get(i));
+					String[][] headerAndTuple = findTupleUsingIndex(curTable, afterSplit, strClusteringKeyValue);
+					String[] header1 = headerAndTuple[0];
+					String[] tuple = headerAndTuple[1];
+
+					for (int j = 1; j < curpage.length; j++) {
+						// loop till i know which one is in the deletion list get the
+						// index from it
+						for (int m = 0; m < header1.length; m++) {
+
+							if (htblColNameValue.containsKey(header1[m])) {
+								String oldVal = tuple[m];
+								// change its value in the tuple
+								tuple[m] = htblColNameValue.get(header1[m]).toString();
+								// check if it is a foreign key in another table
+								updateForeign(header1[m], tuple[m], oldVal);
+							}
+						}
+						// write the updated tuple back to the table
+						writeUpdatedTuple(curTable, tuple);
+					}
+
+					// write the updated tuple back to the table
+					writeUpdatedTuple(curTable, tuple);
+				}
 			} else {
 				// if no index is created on the table
 				// search linearly through the entire table to find the required tuple
@@ -608,6 +668,28 @@ public class DBApp {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public static String[][] findTupleUsingIndex(Table table, ArrayList<String> afterSplit,
+			String strClusteringKeyValue) throws DBAppException {
+		String[][] res;
+		for (int i = 0; i < afterSplit.size(); i++) {
+			String[][] pages = reader.readCSV(table.getPath() + afterSplit.get(i));
+			res = new String[pages.length][2];
+			int clusterColIndex = 0;
+			for (int h = 0; h < pages[0].length; h++) {
+				if (table.getClusterCol().equals(pages[0][h]))
+					clusterColIndex = h;
+			}
+			for (int j = 1; j < pages.length; j++) {
+				if (strClusteringKeyValue.equals(pages[j][clusterColIndex])) {
+					res[0] = pages[0];
+					res[1] = pages[j];
+					return res;
+				}
+			}
+		}
+		throw new DBAppException("Tuple not found in Table");
 	}
 
 	public static void updateForeign(String colName, String newVal, String oldVal) {
