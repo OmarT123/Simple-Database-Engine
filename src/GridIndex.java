@@ -20,7 +20,7 @@ public class GridIndex implements Serializable {
 	public GridIndex(String name, Table table, String colType1, String col1, String min1, String max1, String colType2,
 			String col2, String min2, String max2)
 			throws ClassNotFoundException, InstantiationException, IllegalAccessException, IllegalArgumentException,
-			InvocationTargetException, NoSuchMethodException, SecurityException {
+			InvocationTargetException, NoSuchMethodException, SecurityException, DBAppException {
 		// verify table name
 		// verify col names
 		this.name = name;
@@ -68,53 +68,95 @@ public class GridIndex implements Serializable {
 				this.grid[i][0] = group;
 				j++;
 			}
+		} else if (canParseDouble(min1) && canParseDouble(min2) && canParseDouble(max1) && canParseDouble(max2)) {
+			double min1Int = Double.parseDouble(min1);
+			double max1Int = Double.parseDouble(max1);
+			double min2Int = Double.parseDouble(min2);
+			double max2Int = Double.parseDouble(max2);
 
-		} else {
+			double groupSize1 = (max1Int - min1Int) / gridSize;
+			double groupSize2 = (max2Int - min2Int) / gridSize;
 
-			// not working yet
-
-			Class colClass1 = Class.forName(colType1);
-			Class colClass2 = Class.forName(colType2);
-			Constructor const1 = colClass1.getConstructor(String.class);
-			Constructor const2 = colClass2.getConstructor(String.class);
-
-			Object min1Obj = const1.newInstance(min1);
-			Object max1Obj = const1.newInstance(max1);
-			Object min2Obj = const1.newInstance(min2);
-			Object max2Obj = const1.newInstance(max2);
-
-			// fill headers
-			int groupSize1 = 0;
-			int groupSize2 = (((Comparable) max2Obj).compareTo(min2Obj) + 1) / (gridSize);
-
-			System.out.println(((Comparable) max1Obj).compareTo(min1Obj));
-			System.out.println(groupSize1);
-			System.out.println(groupSize2);
-
-			Object j = min1Obj;
-			int i = 1;
-			for (j = min1Obj; i <= gridSize && ((Comparable) j).compareTo(max1Obj) < 0; incrementObject(j, 1)) {
-				String group = j.toString();
-				incrementObject(j, groupSize1);
-				if (((Comparable) j).compareTo(max1Obj) > 0)
-					j = max1Obj;
-				group += "-" + j.toString();
-				this.grid[0][i++] = group;
+			double j = min1Int;
+			for (int i = 1; i < this.grid.length; i++) {
+				String group = "" + j;
+				j += groupSize1;
+				j = Math.min(j, max1Int);
+				group += "-" + j;
+				this.grid[0][i] = group;
+				j++;
 			}
-			i = 1;
-			for (j = min2Obj; i <= gridSize && ((Comparable) j).compareTo(max2Obj) < 0; incrementObject(j, 1)) {
-				String group = j.toString();
-				incrementObject(j, groupSize2);
-				if (((Comparable) j).compareTo(max2Obj) > 0)
-					j = max2Obj;
-				group += "-" + j.toString();
-				this.grid[i++][0] = group;
+			j = 0;
+			for (int i = 1; i < this.grid.length; i++) {
+				String group = "" + j;
+				j += groupSize2;
+				j = Math.min(j, max2Int);
+				group += "-" + j;
+				this.grid[i][0] = group;
+				j++;
+			}
+		} else   if (canParseInt(min1) && canParseDouble(min2) && canParseInt(max1) && canParseDouble(max2)) {
+			int min1Int = Integer.parseInt(min1);
+			int max1Int = Integer.parseInt(max1);
+			double min2Int = Double.parseDouble(min2);
+			double max2Int = Double.parseDouble(max2);
+
+			int groupSize1 = (max1Int - min1Int) / gridSize;
+			double groupSize2 = (max2Int - min2Int) / gridSize;
+
+			int j = min1Int;
+			for (int i = 1; i < this.grid.length; i++) {
+				String group = "" + j;
+				j += groupSize1;
+				j = Math.min(j, max1Int);
+				group += "-" + j;
+				this.grid[0][i] = group;
+				j++;
+			}
+			double j1 = 0;
+			for (int i = 1; i < this.grid.length; i++) {
+				String group = "" + j1;
+				j1 += groupSize2;
+				j1 = Math.min(j, max2Int);
+				group += "-" + j1;
+				this.grid[i][0] = group;
+				j1++;
+			}
+		} else  if (canParseDouble(min1) && canParseInt(min2) && canParseDouble(max1) && canParseInt(max2)) {
+			double min1Int = Double.parseDouble(min1);
+			double max1Int = Double.parseDouble(max1);
+			int min2Int = Integer.parseInt(min2);
+			int max2Int = Integer.parseInt(max2);
+
+			double groupSize1 = (max1Int - min1Int) / gridSize;
+			int groupSize2 = (max2Int - min2Int) / gridSize;
+
+			double j = min1Int;
+			for (int i = 1; i < this.grid.length; i++) {
+				String group = "" + j;
+				j += groupSize1;
+				j = Math.min(j, max1Int);
+				group += "-" + j;
+				this.grid[0][i] = group;
+				j++;
+			}
+			int j1 = 0;
+			for (int i = 1; i < this.grid.length; i++) {
+				String group = "" + j1;
+				j1 += groupSize2;
+				j1 = Math.min(j1, max2Int);
+				group += "-" + j1;
+				this.grid[i][0] = group;
+				j1++;
 			}
 		}
 		String[][] metaData = Reader.readCSV("metadata.csv");
 		for (int k = 1; k < metaData.length; k++) {
 			if (metaData[k][0].equals(onTable.getName())) {
 				if (metaData[k][1].equals(col1) || metaData[k][1].equals(col2)) {
+					if (metaData[k][4] != null) {
+						throw new DBAppException("An index is already created on column: " + metaData[k][1]);
+					}
 					metaData[k][4] = name;
 					metaData[k][5] = "GridIndex";
 				}
@@ -201,6 +243,15 @@ public class GridIndex implements Serializable {
 		}
 	}
 
+	public static boolean canParseDouble(String str) {
+		try {
+			Double.parseDouble(str);
+			return true;
+		} catch (NumberFormatException e) {
+			return false;
+		}
+	}
+	
 	public String getName() {
 		return name;
 	}
