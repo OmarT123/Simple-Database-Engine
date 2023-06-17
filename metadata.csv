@@ -1,7 +1,7 @@
-TableName,ColumnName,ColumnType,ClusteringKey,IndexName,IndexType,min,max,ForeignKey,ForeignTableName,ForeignColumnName,Computed,
-Product,ProductID,java.lang.Integer,True,ProductID_ProductPrice_index,GridIndex,0,1000,False,null,null,False,
-Product,ProductPrice,java.lang.Double,False,ProductID_ProductPrice_index,GridIndex,0,100000,False,null,null,False,
-Product,ProductName,java.lang.String,False,null,null,A,ZZZZZZZZ,False,null,null,False,
+TableName,ColumnName,ColumnType,ClusteringKey,IndexName,IndexType,min,max,ForeignKey,ForeignTableName,ForeignColumnName,Computed
+Product,ProductID,java.lang.Integer,True,null,null,0,1000,False,null,null,False
+Product,ProductPrice,java.lang.Double,False,null,null,0,100000,False,null,null,False
+Product,ProductName,java.lang.String,False,null,null,A,ZZZZZZZZ,False,null,null,False
 Sale,TotalAmount,java.lang.Double,False,null,null,0,1000000000,False,null,null,True
 Sale,ProductID,java.lang.Integer,False,null,null,0,1000,True,Product,ProductID,False
 Sale,SaleID,java.lang.Integer,True,null,null,0,10000,False,null,null,False

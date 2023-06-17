@@ -22,6 +22,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 import java.text.DateFormat;
+import java.text.DecimalFormat;
 
 public class DBApp {
 	static Writer writer;
@@ -434,15 +435,42 @@ public class DBApp {
 			for (int i = 0; i < tableMeta.length; i++) {
 				// getting column name and its value
 				String colName = tableMeta[i][1];
-				boolean computed = tableMeta[i][11].equals("true") ? true : false;
+				boolean computed = tableMeta[i][11].equals("True") ? true : false;
+				Object value = null;
 				if (!htblColNameValue.containsKey(colName) && computed) {
 					// compute value
-
-					continue;
+					value = (Double)Double.parseDouble(htblColNameValue.get("Quantity").toString());
+					Table product = tables.get("Product");
+					for (int a = 0; a < product.getPages().size(); a++) {
+						String[][] ppage = reader.readCSV(product.getPages().get(a).getPath());
+						String[] pheader = ppage[0];
+						int cindex = 0;
+						int pindex = 0;
+						for (int b = 0; b < pheader.length; b++) {
+							if (pheader[b].equals(product.getClusterCol()))
+								cindex = b;
+							if (pheader[b].equals("ProductPrice"))
+								pindex = b;
+						}
+						boolean done = false;
+						for (int b = 1; b < ppage.length; b++) {
+							if (((int)htblColNameValue.get("ProductID")) == Integer.parseInt(ppage[b][cindex])) {
+								value =Double.parseDouble(htblColNameValue.get("Quantity").toString()) * Double.parseDouble(ppage[b][pindex]);
+								done = true;
+								break;
+							}
+						}
+						if (done)
+							break;
+					}
+					String formattedNumber = String.format("%.2f", value);
+					//System.out.println(formattedNumber);
+					sb.append(formattedNumber);
 				}
-				if (htblColNameValue.containsKey(colName) && computed)
+				else if (htblColNameValue.containsKey(colName) && computed)
 					throw new DBAppException(colName + " is a computed col and should not be inserted");
-				Object value = htblColNameValue.get(colName);
+				else 
+					value = htblColNameValue.get(colName);
 				if (colName.equals(res[1]))
 					res[3] = value.toString();
 				// getting control data from csv file to verify the input tuple
@@ -483,7 +511,8 @@ public class DBApp {
 					throw new DBAppException(colName + " value is greater than the maximum value (" + max + ")");
 				if (colType.equals("java.lang.Date"))
 					value = new String(convertDateFormat(value.toString()));
-				sb.append(value.toString());
+				if (!computed)
+					sb.append(value.toString());
 				if (i != tableMeta.length - 1)
 					sb.append(",");
 			}
@@ -590,7 +619,6 @@ public class DBApp {
 						exist = true;
 						gridindex = i;
 					}
-
 				}
 			}
 			// if there is an index created on the table required
@@ -610,7 +638,6 @@ public class DBApp {
 					String[] temp = pages[i].split("-");
 					for (String s : temp)
 						afterSplit.add(s);
-
 				}
 				HashSet<String> uniqueSet = new HashSet<>(afterSplit);
 				afterSplit = new ArrayList<>(uniqueSet);
@@ -624,7 +651,6 @@ public class DBApp {
 						// loop till i know which one is in the deletion list get the
 						// index from it
 						for (int m = 0; m < header1.length; m++) {
-
 							if (htblColNameValue.containsKey(header1[m])) {
 								String oldVal = tuple[m];
 								// change its value in the tuple
@@ -636,7 +662,6 @@ public class DBApp {
 						// write the updated tuple back to the table
 						writeUpdatedTuple(curTable, tuple);
 					}
-
 					// write the updated tuple back to the table
 					writeUpdatedTuple(curTable, tuple);
 				}
@@ -961,6 +986,7 @@ public class DBApp {
 			return null;
 		try {
 			int[] gridindecies = new int[arrSQLTerms.length * 2];
+			Arrays.fill(gridindecies, -1);
 			for (int j = 0; j < arrSQLTerms.length; j++) {
 				for (int k = 0; k < t.getIndecies().size(); k++) {
 					String[] column = t.getIndecies().get(k).getName().split("_");

@@ -37,13 +37,13 @@ public class Tester {
 			db.createTable("Product", "ProductID", htblColNameType, htblColNameMin, htblColNameMax, htblForeignKeys,
 					computedCols);
 			Hashtable<String, Object> htblColNameVal = new Hashtable<>();
-			String[] ind = { "ProductID", "ProductPrice" };
-			db.createIndex("Product", ind);
+//			String[] ind = { "ProductID", "ProductPrice" };
+//			db.createIndex("Product", ind);
 			for (int i = 0; i <= 1000; i++) {
 				htblColNameVal = new Hashtable<>();
 				htblColNameVal.put("ProductID", new Integer(i));
 				htblColNameVal.put("ProductName", new String("Power Bank"));
-				htblColNameVal.put("ProductPrice", new Double(9999 + i));
+				htblColNameVal.put("ProductPrice", new Double(9999.5 + i));
 				db.insertIntoTable("Product", htblColNameVal);
 			}
 
@@ -76,22 +76,22 @@ public class Tester {
 				htblColNameVal.put("SaleDate", new Date(2023, 21, 3));
 				htblColNameVal.put("ProductID", new Integer(i));
 				htblColNameVal.put("Quantity", new Integer(i + 1));
-				htblColNameVal.put("TotalAmount", new Double(i + 200));
+//				htblColNameVal.put("TotalAmount", new Double(i + 200));
 				db.insertIntoTable("Sale", htblColNameVal);
 			}
 
 //			htblColNameVal = new Hashtable<>();
 //			htblColNameVal.put("ProductPrice", new Integer(7777));
 //			db.updateTable("Product", "1", htblColNameVal);
-			SQLTerm[] arrsqlSqlTerms = new SQLTerm[2];
-			arrsqlSqlTerms[0] = new SQLTerm("Product", "ProductID", ">", new Integer(200));
-			arrsqlSqlTerms[1] = new SQLTerm("Product", "ProductPrice", ">", new Double(10500));
-			String[] operators = new String[1];
-			operators[0] = "AND";
-			Iterator resultSet = db.selectFromTable(arrsqlSqlTerms, operators);
-			while (resultSet.hasNext()) {
-				System.out.println(db.convertToString((String[]) resultSet.next()));
-			}
+//			SQLTerm[] arrsqlSqlTerms = new SQLTerm[2];
+//			arrsqlSqlTerms[0] = new SQLTerm("Product", "ProductID", ">", new Integer(200));
+//			arrsqlSqlTerms[1] = new SQLTerm("Product", "ProductPrice", ">", new Double(10500));
+//			String[] operators = new String[1];
+//			operators[0] = "AND";
+//			Iterator resultSet = db.selectFromTable(arrsqlSqlTerms, operators);
+//			while (resultSet.hasNext()) {
+//				System.out.println(db.convertToString((String[]) resultSet.next()));
+//			}
 			System.out.println("Terminated");
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
